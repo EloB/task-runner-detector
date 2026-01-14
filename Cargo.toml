@@ -5,6 +5,11 @@ edition = "2021"
 description = "Detect and run tasks from various task runner config files"
 license = "MIT"
 rust-version = "1.75"
+repository = "https://github.com/elob/task-runner-detector"
+homepage = "https://github.com/elob/task-runner-detector"
+readme = "README.md"
+keywords = ["task-runner", "cli", "npm", "makefile", "monorepo"]
+categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]
 name = "task"
