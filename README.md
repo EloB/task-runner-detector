@@ -4,6 +4,8 @@ A fast CLI tool that discovers and runs tasks from various config files in your 
 
 Scans your directory for task runner configs (package.json, Makefile, Cargo.toml, etc.) and presents an interactive picker to run them.
 
+![demo](https://github.com/user-attachments/assets/cb07b554-fb1f-4c85-9cc9-e76debe19809)
+
 ## Installation
 
 ```bash
