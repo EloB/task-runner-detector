@@ -527,9 +527,9 @@ fn run_picker_inner(
         output.push_str(&format!("\x1b[90m  {} tasks found\x1b[0m\x1b[K\r\n", all_tasks.len()));
         output.push_str("\x1b[K\r\n");
 
-        // Input line - different display for select vs edit mode
-        // Show cursor as a block on the current character, or a block at the end if at end of string
-        fn render_input(input: &Input) -> (String, char, String) {
+        // Input line - show filter query (cursor only in select mode)
+        // In edit mode, the cursor is shown inline on the selected task
+        fn render_input_with_cursor(input: &Input) -> (String, char, String) {
             let value = input.value();
             let cursor = input.cursor();
             if cursor < value.len() {
@@ -543,17 +543,16 @@ fn run_picker_inner(
         }
 
         if mode == PickerMode::Select {
-            let (before, at, after) = render_input(&query_input);
+            let (before, at, after) = render_input_with_cursor(&query_input);
             output.push_str(&format!(
                 "\x1b[36m❯ \x1b[0m{}\x1b[7m{}\x1b[0m{}\x1b[K\r\n",
                 before, at, after
             ));
         } else {
-            // Edit mode - show the command being edited
-            let (before, at, after) = render_input(&edit_input);
+            // Edit mode - show query without cursor (cursor is on the task)
             output.push_str(&format!(
-                "\x1b[33m$ \x1b[0m{}\x1b[7m{}\x1b[0m{}\x1b[K\r\n",
-                before, at, after
+                "\x1b[90m❯ {}\x1b[0m\x1b[K\r\n",
+                query_input.value()
             ));
         }
         output.push_str("\x1b[K\r\n");
@@ -625,6 +624,10 @@ fn run_picker_inner(
                     let task = &all_tasks[*idx];
                     let icon = task.runner.icon();
 
+                    // In edit mode, non-selected tasks are dimmed
+                    let is_editing_this = is_selected && mode == PickerMode::Edit;
+                    let is_dimmed = mode == PickerMode::Edit && !is_selected;
+
                     let runner_color = match task.runner.color_code() {
                         1 => "31", // Red
                         2 => "32", // Green
@@ -633,18 +636,6 @@ fn run_picker_inner(
                         5 => "35", // Magenta
                         6 => "36", // Cyan
                         _ => "37", // White
-                    };
-
-                    // Split command: "npm run build" -> runner="npm", subcommand="run", task="build"
-                    let cmd_parts: Vec<&str> = task.task.command.split_whitespace().collect();
-                    let cmd_runner = cmd_parts.first().unwrap_or(&"");
-
-                    let (subcommand, task_name) = if cmd_parts.len() >= 3 && (cmd_parts[1] == "run" || cmd_parts[1] == "task") {
-                        (cmd_parts[1], cmd_parts[2..].join(" "))
-                    } else if cmd_parts.len() >= 2 {
-                        ("", cmd_parts[1..].join(" "))
-                    } else {
-                        ("", String::new())
                     };
 
                     // Build tree prefix from dynamic parent_lasts
@@ -659,60 +650,79 @@ fn run_picker_inner(
 
                     // Tree branch characters - use dynamic is_last
                     let branch = if is_last_dynamic { "└─" } else { "├─" };
-                    let branch_color = if is_selected { "36" } else { "90" };
+                    let branch_color = if is_dimmed { "90" } else if is_selected { "36" } else { "90" };
 
                     let selection_marker = if is_selected { "\x1b[36m❯\x1b[0m" } else { " " };
 
+                    // Render the command - with cursor if editing, colored otherwise
+                    let command_display = if is_editing_this {
+                        // Show with inline cursor
+                        let (before, at, after) = render_input_with_cursor(&edit_input);
+                        format!("{}\x1b[7m{}\x1b[0m{}", before, at, after)
+                    } else if is_dimmed {
+                        // Fully dimmed
+                        format!("\x1b[90m{}\x1b[0m", task.task.command)
+                    } else {
+                        // Normal colored display: "npm run build" -> colored npm, dim run, bold build
+                        let cmd_parts: Vec<&str> = task.task.command.split_whitespace().collect();
+                        let cmd_runner = cmd_parts.first().unwrap_or(&"");
+
+                        if cmd_parts.len() >= 3 && (cmd_parts[1] == "run" || cmd_parts[1] == "task") {
+                            let subcommand = cmd_parts[1];
+                            let task_name = cmd_parts[2..].join(" ");
+                            format!(
+                                "\x1b[{}m{}\x1b[0m \x1b[90m{}\x1b[0m \x1b[1;37m{}\x1b[0m",
+                                runner_color, cmd_runner, subcommand, task_name
+                            )
+                        } else if cmd_parts.len() >= 2 {
+                            let task_name = cmd_parts[1..].join(" ");
+                            format!(
+                                "\x1b[{}m{}\x1b[0m \x1b[1;37m{}\x1b[0m",
+                                runner_color, cmd_runner, task_name
+                            )
+                        } else {
+                            format!("\x1b[{}m{}\x1b[0m", runner_color, task.task.command)
+                        }
+                    };
+
                     if *depth == 0 {
                         // Root level task, minimal indentation
-                        if subcommand.is_empty() {
+                        if is_dimmed {
                             output.push_str(&format!(
-                                "  {}{} {}  \x1b[{}m{}\x1b[0m \x1b[1;37m{}\x1b[0m\x1b[K\r\n",
+                                "  {} \x1b[90m{}\x1b[0m  {}\x1b[K\r\n",
                                 selection_marker,
-                                if is_selected { "\x1b[36m" } else { "" },
                                 icon,
-                                runner_color,
-                                cmd_runner,
-                                task_name,
+                                command_display,
                             ));
                         } else {
                             output.push_str(&format!(
-                                "  {}{} {}  \x1b[{}m{}\x1b[0m \x1b[90m{}\x1b[0m \x1b[1;37m{}\x1b[0m\x1b[K\r\n",
+                                "  {}{} {}  {}\x1b[K\r\n",
                                 selection_marker,
                                 if is_selected { "\x1b[36m" } else { "" },
                                 icon,
-                                runner_color,
-                                cmd_runner,
-                                subcommand,
-                                task_name,
+                                command_display,
                             ));
                         }
                     } else {
                         // Nested task with tree branch
-                        if subcommand.is_empty() {
+                        if is_dimmed {
                             output.push_str(&format!(
-                                "\x1b[{}m{}{}\x1b[0m {} {}  \x1b[{}m{}\x1b[0m \x1b[1;37m{}\x1b[0m\x1b[K\r\n",
-                                branch_color,
+                                "\x1b[90m{}{}\x1b[0m {} \x1b[90m{}\x1b[0m  {}\x1b[K\r\n",
                                 prefix,
                                 branch,
                                 selection_marker,
                                 icon,
-                                runner_color,
-                                cmd_runner,
-                                task_name,
+                                command_display,
                             ));
                         } else {
                             output.push_str(&format!(
-                                "\x1b[{}m{}{}\x1b[0m {} {}  \x1b[{}m{}\x1b[0m \x1b[90m{}\x1b[0m \x1b[1;37m{}\x1b[0m\x1b[K\r\n",
+                                "\x1b[{}m{}{}\x1b[0m {} {}  {}\x1b[K\r\n",
                                 branch_color,
                                 prefix,
                                 branch,
                                 selection_marker,
                                 icon,
-                                runner_color,
-                                cmd_runner,
-                                subcommand,
-                                task_name,
+                                command_display,
                             ));
                         }
                     }
@@ -851,12 +861,10 @@ fn run_picker_inner(
                         };
 
                         if let Some(req) = request {
-                            let prev_value;
                             if mode == PickerMode::Edit {
-                                prev_value = edit_input.value().to_string();
                                 edit_input.handle(req);
                             } else {
-                                prev_value = query_input.value().to_string();
+                                let prev_value = query_input.value().to_string();
                                 query_input.handle(req);
                                 // Reset selection if query changed
                                 if query_input.value() != prev_value {
