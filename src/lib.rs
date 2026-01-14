@@ -119,6 +119,9 @@ pub struct Task {
     /// Optional description of what the task does
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// The actual script content (e.g., the shell command in package.json scripts)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub script: Option<String>,
 }
 
 /// A task runner configuration file with its discovered tasks

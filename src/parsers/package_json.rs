@@ -59,10 +59,11 @@ impl Parser for PackageJsonParser {
 
         let tasks: Vec<Task> = scripts
             .into_iter()
-            .map(|(name, _script)| Task {
+            .map(|(name, script)| Task {
                 command: Self::run_command(runner_type, &name),
                 name,
                 description: None,
+                script: Some(script),
             })
             .collect();
 

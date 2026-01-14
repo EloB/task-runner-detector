@@ -40,6 +40,7 @@ impl Parser for MakefileParser {
                         name: target.clone(),
                         command: format!("make {}", target),
                         description: None, // makefile-lossless doesn't expose comments
+                        script: None,      // Makefile recipes not easily extractable
                     });
                 }
             }

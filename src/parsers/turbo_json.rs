@@ -44,6 +44,7 @@ impl Parser for TurboJsonParser {
                 name: name.clone(),
                 command: format!("turbo run {}", name),
                 description: Some("Turborepo task (runs across workspaces)".to_string()),
+                script: None,
             })
             .collect();
 

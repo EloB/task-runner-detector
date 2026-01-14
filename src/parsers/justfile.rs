@@ -38,6 +38,7 @@ impl Parser for JustfileParser {
                 name: name.clone(),
                 command: format!("just {}", name),
                 description: None,
+                script: None, // Just recipes are more complex
             });
         }
 

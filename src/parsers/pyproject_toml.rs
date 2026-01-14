@@ -79,7 +79,8 @@ impl Parser for PyprojectTomlParser {
                             tasks.push(Task {
                                 name: name.clone(),
                                 command: format!("poetry run {}", name),
-                                description: Some(cmd),
+                                description: Some(cmd.clone()),
+                                script: Some(cmd),
                             });
                         }
                     }
@@ -96,7 +97,8 @@ impl Parser for PyprojectTomlParser {
                             tasks.push(Task {
                                 name: name.clone(),
                                 command: format!("pdm run {}", name),
-                                description: Some(cmd),
+                                description: Some(cmd.clone()),
+                                script: Some(cmd),
                             });
                         }
                     }
@@ -112,6 +114,7 @@ impl Parser for PyprojectTomlParser {
                         name: name.clone(),
                         command: name.clone(), // Entry points are installed as commands
                         description: Some(format!("Entry point: {}", entry_point)),
+                        script: None,
                     });
                 }
             }

@@ -740,7 +740,7 @@ fn run_picker_inner(
             ));
         } else {
             output.push_str(
-                "\x1b[90m  edit mode │ ↑↓ back to select │ tab back │ enter run │ esc cancel\x1b[0m\x1b[K"
+                "\x1b[90m  edit mode │ ↑↓ back to select │ tab expand/back │ enter run │ esc cancel\x1b[0m\x1b[K"
             );
         }
 
@@ -779,8 +779,18 @@ fn run_picker_inner(
                                 mode = PickerMode::Edit;
                             }
                         } else {
-                            // Back to select mode
-                            mode = PickerMode::Select;
+                            // Already in edit mode - double-tab expands to script if available
+                            if let Some((_, PickerItem::Task { idx, .. })) = filtered.get(selected) {
+                                if let Some(script) = &all_tasks[*idx].task.script {
+                                    edit_input = script.as_str().into();
+                                    edit_input.handle(tui_input::InputRequest::GoToEnd);
+                                } else {
+                                    // No script available, back to select mode
+                                    mode = PickerMode::Select;
+                                }
+                            } else {
+                                mode = PickerMode::Select;
+                            }
                         }
                     }
                     KeyCode::Up => {

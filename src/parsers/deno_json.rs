@@ -131,9 +131,10 @@ impl Parser for DenoJsonParser {
                     description: if description.is_some() {
                         description
                     } else {
-                        Some(command_str)
+                        Some(command_str.clone())
                     },
                     name,
+                    script: Some(command_str),
                 }
             })
             .collect();

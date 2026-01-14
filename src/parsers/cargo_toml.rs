@@ -54,6 +54,7 @@ impl Parser for CargoTomlParser {
                             name: name.clone(),
                             command: command.clone(),
                             description: None,
+                            script: Some(command.clone()),
                         });
                     }
                 }
@@ -67,6 +68,7 @@ impl Parser for CargoTomlParser {
                     name: bin.name.clone(),
                     command: format!("cargo run --bin {}", bin.name),
                     description: Some(format!("Run the {} binary", bin.name)),
+                    script: None,
                 });
             }
         }
@@ -80,16 +82,19 @@ impl Parser for CargoTomlParser {
                         name: "build".to_string(),
                         command: "cargo build".to_string(),
                         description: Some("Build the package".to_string()),
+                        script: None,
                     });
                     tasks.push(Task {
                         name: "test".to_string(),
                         command: "cargo test".to_string(),
                         description: Some("Run tests".to_string()),
+                        script: None,
                     });
                     tasks.push(Task {
                         name: "run".to_string(),
                         command: "cargo run".to_string(),
                         description: Some("Run the package".to_string()),
+                        script: None,
                     });
                 }
             }
