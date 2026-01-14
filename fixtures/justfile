@@ -1,0 +1,29 @@
+# Development tasks
+dev:
+    echo "Watching for file changes..."
+
+# Build for production
+build:
+    echo "Optimizing for production..."
+
+# Run database migrations
+migrate:
+    echo "Updating database schema..."
+
+# Start local services
+up:
+    echo "Spinning up containers..."
+
+# Stop local services
+down:
+    echo "Shutting down services..."
+
+# Run all checks
+check:
+    echo "Running pre-commit checks..."
+
+lint:
+    echo "Analyzing code style..."
+
+test:
+    echo "Executing test cases..."

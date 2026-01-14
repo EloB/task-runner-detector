@@ -1,0 +1,10 @@
+{
+  "name": "monorepo",
+  "scripts": {
+    "build": "echo Building the entire monorepo...",
+    "dev": "echo Starting development servers...",
+    "lint": "echo Checking code quality...",
+    "test": "echo Running the test suite...",
+    "clean": "echo Cleaning up build artifacts..."
+  }
+}

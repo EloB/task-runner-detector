@@ -1,0 +1,15 @@
+[project]
+name = "api-scripts"
+version = "0.1.0"
+
+[project.scripts]
+seed = "echo Populating test data..."
+migrate = "echo Applying migrations..."
+
+[tool.poetry.scripts]
+format = "echo Formatting Python code..."
+lint = "echo Running ruff checks..."
+
+[tool.pdm.scripts]
+serve = "echo Starting API server..."
+test = "echo Running pytest suite..."

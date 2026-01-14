@@ -1,0 +1,11 @@
+{
+  "name": "@myapp/ui",
+  "scripts": {
+    "build": "echo Compiling component library...",
+    "dev": "echo Watching for changes...",
+    "lint": "echo Linting components...",
+    "test": "echo Testing UI components...",
+    "storybook": "echo Launching Storybook...",
+    "build-storybook": "echo Building static Storybook..."
+  }
+}

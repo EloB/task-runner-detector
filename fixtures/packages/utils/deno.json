@@ -1,0 +1,11 @@
+{
+  "name": "@myapp/utils",
+  "tasks": {
+    "dev": "echo Reloading on save...",
+    "test": "echo Running Deno tests...",
+    "lint": "echo Checking with deno lint...",
+    "fmt": "echo Formatting source files...",
+    "check": "echo Type checking modules...",
+    "compile": "echo Creating standalone binary..."
+  }
+}

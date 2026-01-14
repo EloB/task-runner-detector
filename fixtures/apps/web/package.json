@@ -1,0 +1,12 @@
+{
+  "name": "@myapp/web",
+  "scripts": {
+    "dev": "echo Hot reloading the web app...",
+    "build": "echo Bundling for production...",
+    "start": "echo Serving the built app...",
+    "lint": "echo Checking for lint errors...",
+    "test": "echo Running component tests...",
+    "test:watch": "echo Watching tests...",
+    "typecheck": "echo Validating TypeScript types..."
+  }
+}
