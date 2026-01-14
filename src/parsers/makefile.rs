@@ -15,10 +15,7 @@ impl MakefileParser {
     /// Check if a target name should be exposed as a runnable task
     fn is_runnable_target(name: &str) -> bool {
         // Skip special targets and internal targets
-        !name.starts_with('.')
-            && !name.starts_with('_')
-            && !name.contains('%')
-            && !name.is_empty()
+        !name.starts_with('.') && !name.starts_with('_') && !name.contains('%') && !name.is_empty()
     }
 }
 

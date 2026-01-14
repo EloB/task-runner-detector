@@ -50,3 +50,18 @@ tempfile = "3"
 lto = true
 strip = true
 codegen-units = 1
+
+[package.metadata.release]
+tag-prefix = "v"
+tag-message = "Release {{version}}"
+pre-release-commit-message = "chore: release {{version}}"
+pre-release-hook = ["cargo", "test", "--", "--quiet"]
+pre-release-replacements = []
+
+# Run these checks before releasing
+[[package.metadata.release.pre-release-hooks]]
+command = ["cargo", "fmt", "--check"]
+[[package.metadata.release.pre-release-hooks]]
+command = ["cargo", "clippy", "--", "-D", "warnings"]
+[[package.metadata.release.pre-release-hooks]]
+command = ["cargo", "test"]

@@ -65,7 +65,7 @@ impl Parser for PubspecYamlParser {
         }
 
         // Check for executables (Dart CLI tools)
-        for (name, _) in &pubspec.executables {
+        for name in pubspec.executables.keys() {
             tasks.push(Task {
                 name: name.clone(),
                 command: format!("dart run {}", name),

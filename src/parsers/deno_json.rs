@@ -95,11 +95,7 @@ impl Parser for DenoJsonParser {
         let content = fs::read_to_string(path)?;
 
         // Handle JSONC (JSON with comments)
-        let content = if path
-            .extension()
-            .map(|e| e == "jsonc")
-            .unwrap_or(false)
-        {
+        let content = if path.extension().map(|e| e == "jsonc").unwrap_or(false) {
             Self::strip_jsonc_comments(&content)
         } else {
             content

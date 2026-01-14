@@ -24,10 +24,11 @@ impl Parser for TurboJsonParser {
     fn parse(&self, path: &Path) -> Result<Option<TaskRunner>, ScanError> {
         let content = fs::read_to_string(path)?;
 
-        let turbo: TurboJson = serde_json::from_str(&content).map_err(|e| ScanError::ParseError {
-            path: path.to_path_buf(),
-            message: e.to_string(),
-        })?;
+        let turbo: TurboJson =
+            serde_json::from_str(&content).map_err(|e| ScanError::ParseError {
+                path: path.to_path_buf(),
+                message: e.to_string(),
+            })?;
 
         // Prefer v2 tasks, fall back to v1 pipeline
         let task_map = turbo.tasks.or(turbo.pipeline);

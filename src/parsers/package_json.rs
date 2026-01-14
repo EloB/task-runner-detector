@@ -45,10 +45,11 @@ impl Parser for PackageJsonParser {
     fn parse(&self, path: &Path) -> Result<Option<TaskRunner>, ScanError> {
         let content = fs::read_to_string(path)?;
 
-        let pkg: PackageJson = serde_json::from_str(&content).map_err(|e| ScanError::ParseError {
-            path: path.to_path_buf(),
-            message: e.to_string(),
-        })?;
+        let pkg: PackageJson =
+            serde_json::from_str(&content).map_err(|e| ScanError::ParseError {
+                path: path.to_path_buf(),
+                message: e.to_string(),
+            })?;
 
         let scripts = match pkg.scripts {
             Some(s) if !s.is_empty() => s,

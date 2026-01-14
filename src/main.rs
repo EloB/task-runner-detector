@@ -155,8 +155,16 @@ fn run_interactive(runners: Vec<TaskRunner>, root: PathBuf) {
     all_tasks.sort_by(|a, b| {
         let a_folder = folder_key(a, &root);
         let b_folder = folder_key(b, &root);
-        let a_depth = if a_folder == "." { 0 } else { a_folder.matches('/').count() + 1 };
-        let b_depth = if b_folder == "." { 0 } else { b_folder.matches('/').count() + 1 };
+        let a_depth = if a_folder == "." {
+            0
+        } else {
+            a_folder.matches('/').count() + 1
+        };
+        let b_depth = if b_folder == "." {
+            0
+        } else {
+            b_folder.matches('/').count() + 1
+        };
 
         a_depth
             .cmp(&b_depth)
@@ -275,7 +283,11 @@ struct PickerResult {
     command: String,
 }
 
-fn run_picker(items: &[PickerItem], all_tasks: &[DisplayTask], root: &PathBuf) -> Option<PickerResult> {
+fn run_picker(
+    items: &[PickerItem],
+    all_tasks: &[DisplayTask],
+    root: &PathBuf,
+) -> Option<PickerResult> {
     // Enable virtual terminal processing on Windows for ANSI support
     #[cfg(windows)]
     let _ = crossterm::ansi_support::supports_ansi();
@@ -323,7 +335,7 @@ fn run_picker_inner(
         let filtered: Vec<(usize, &PickerItem)> = if query.is_empty() {
             items.iter().enumerate().collect()
         } else {
-            let pattern = Pattern::parse(&query, CaseMatching::Ignore, Normalization::Smart);
+            let pattern = Pattern::parse(query, CaseMatching::Ignore, Normalization::Smart);
 
             // First, find which tasks match with fuzzy matching
             let matching_tasks: Vec<usize> = items
@@ -349,7 +361,8 @@ fn run_picker_inner(
                 .collect();
 
             // Find which folder paths have matching tasks (including all parent paths)
-            let mut matching_folder_paths: std::collections::HashSet<String> = std::collections::HashSet::new();
+            let mut matching_folder_paths: std::collections::HashSet<String> =
+                std::collections::HashSet::new();
             // Always include root (empty path)
             matching_folder_paths.insert(String::new());
 
@@ -477,8 +490,8 @@ fn run_picker_inner(
         fn is_last_in_filtered(filtered: &[(usize, &PickerItem)], i: usize) -> bool {
             let current_depth = item_depth(filtered[i].1);
             // Look at remaining items to see if there's a sibling
-            for j in (i + 1)..filtered.len() {
-                let next_depth = item_depth(filtered[j].1);
+            for (_, item) in filtered.iter().skip(i + 1) {
+                let next_depth = item_depth(item);
                 if next_depth < current_depth {
                     // We've gone up in the tree, so current was last at its level
                     return true;
@@ -525,7 +538,10 @@ fn run_picker_inner(
 
         // Header - \x1b[K clears from cursor to end of line
         output.push_str("\x1b[36m  Task Runner Detector\x1b[0m\x1b[K\r\n");
-        output.push_str(&format!("\x1b[90m  {} tasks found\x1b[0m\x1b[K\r\n", all_tasks.len()));
+        output.push_str(&format!(
+            "\x1b[90m  {} tasks found\x1b[0m\x1b[K\r\n",
+            all_tasks.len()
+        ));
         output.push_str("\x1b[K\r\n");
 
         // Input line - show filter query (cursor only in select mode)
@@ -578,7 +594,10 @@ fn run_picker_inner(
                     }
 
                     let branch = if is_last { "└─" } else { "├─" };
-                    output.push_str(&format!("\x1b[90m{}{}\x1b[0m 📁 \x1b[1;37m{}\x1b[0m\x1b[K\r\n", prefix, branch, name));
+                    output.push_str(&format!(
+                        "\x1b[90m{}{}\x1b[0m 📁 \x1b[1;37m{}\x1b[0m\x1b[K\r\n",
+                        prefix, branch, name
+                    ));
                 }
             }
         }
@@ -618,7 +637,10 @@ fn run_picker_inner(
                         let branch = if is_last_dynamic { "└─" } else { "├─" };
 
                         // Nested folder - dim branch, bold white name
-                        output.push_str(&format!("\x1b[90m{}{}\x1b[0m 📁 \x1b[1;37m{}\x1b[0m\x1b[K\r\n", prefix, branch, name));
+                        output.push_str(&format!(
+                            "\x1b[90m{}{}\x1b[0m 📁 \x1b[1;37m{}\x1b[0m\x1b[K\r\n",
+                            prefix, branch, name
+                        ));
                     }
                 }
                 PickerItem::Task { idx, depth, .. } => {
@@ -651,9 +673,19 @@ fn run_picker_inner(
 
                     // Tree branch characters - use dynamic is_last
                     let branch = if is_last_dynamic { "└─" } else { "├─" };
-                    let branch_color = if is_dimmed { "90" } else if is_selected { "36" } else { "90" };
+                    let branch_color = if is_dimmed {
+                        "90"
+                    } else if is_selected {
+                        "36"
+                    } else {
+                        "90"
+                    };
 
-                    let selection_marker = if is_selected { "\x1b[36m❯\x1b[0m" } else { " " };
+                    let selection_marker = if is_selected {
+                        "\x1b[36m❯\x1b[0m"
+                    } else {
+                        " "
+                    };
 
                     // Render the command - with cursor if editing, colored otherwise
                     let command_display = if is_editing_this {
@@ -668,7 +700,8 @@ fn run_picker_inner(
                         let cmd_parts: Vec<&str> = task.task.command.split_whitespace().collect();
                         let cmd_runner = cmd_parts.first().unwrap_or(&"");
 
-                        if cmd_parts.len() >= 3 && (cmd_parts[1] == "run" || cmd_parts[1] == "task") {
+                        if cmd_parts.len() >= 3 && (cmd_parts[1] == "run" || cmd_parts[1] == "task")
+                        {
                             let subcommand = cmd_parts[1];
                             let task_name = cmd_parts[2..].join(" ");
                             format!(
@@ -691,9 +724,7 @@ fn run_picker_inner(
                         if is_dimmed {
                             output.push_str(&format!(
                                 "  {} \x1b[90m{}\x1b[0m  {}\x1b[K\r\n",
-                                selection_marker,
-                                icon,
-                                command_display,
+                                selection_marker, icon, command_display,
                             ));
                         } else {
                             output.push_str(&format!(
@@ -709,11 +740,7 @@ fn run_picker_inner(
                         if is_dimmed {
                             output.push_str(&format!(
                                 "\x1b[90m{}{}\x1b[0m {} \x1b[90m{}\x1b[0m  {}\x1b[K\r\n",
-                                prefix,
-                                branch,
-                                selection_marker,
-                                icon,
-                                command_display,
+                                prefix, branch, selection_marker, icon, command_display,
                             ));
                         } else {
                             output.push_str(&format!(
@@ -736,7 +763,10 @@ fn run_picker_inner(
         if mode == PickerMode::Select {
             output.push_str(&format!(
                 "\x1b[90m  {}/{} │ ↑↓ navigate │ tab edit │ enter run │ esc cancel\x1b[0m\x1b[K",
-                filtered.iter().filter(|(_, i)| matches!(i, PickerItem::Task { .. })).count(),
+                filtered
+                    .iter()
+                    .filter(|(_, i)| matches!(i, PickerItem::Task { .. }))
+                    .count(),
                 all_tasks.len()
             ));
         } else {
@@ -753,135 +783,136 @@ fn run_picker_inner(
         stdout.flush().ok();
 
         // Handle input
-        if let Ok(event) = event::read() {
-            if let Event::Key(key) = &event {
-                match key.code {
-                    KeyCode::Esc => return None,
-                    KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                        return None;
-                    }
-                    KeyCode::Enter => {
-                        if let Some((_, PickerItem::Task { idx, .. })) = filtered.get(selected) {
-                            let command = if mode == PickerMode::Edit {
-                                edit_input.value().to_string()
-                            } else {
-                                all_tasks[*idx].task.command.clone()
-                            };
-                            return Some(PickerResult { task_idx: *idx, command });
-                        }
-                    }
-                    KeyCode::Tab => {
-                        if mode == PickerMode::Select {
-                            // Enter edit mode with current task's command
-                            if let Some((_, PickerItem::Task { idx, .. })) = filtered.get(selected) {
-                                edit_input = all_tasks[*idx].task.command.as_str().into();
-                                // Move cursor to end
-                                edit_input.handle(tui_input::InputRequest::GoToEnd);
-                                mode = PickerMode::Edit;
-                            }
+        if let Ok(Event::Key(key)) = event::read() {
+            match key.code {
+                KeyCode::Esc => return None,
+                KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    return None;
+                }
+                KeyCode::Enter => {
+                    if let Some((_, PickerItem::Task { idx, .. })) = filtered.get(selected) {
+                        let command = if mode == PickerMode::Edit {
+                            edit_input.value().to_string()
                         } else {
-                            // Already in edit mode - double-tab expands to script if available
-                            if let Some((_, PickerItem::Task { idx, .. })) = filtered.get(selected) {
-                                if let Some(script) = &all_tasks[*idx].task.script {
-                                    edit_input = script.as_str().into();
-                                    edit_input.handle(tui_input::InputRequest::GoToEnd);
-                                } else {
-                                    // No script available, back to select mode
-                                    mode = PickerMode::Select;
-                                }
+                            all_tasks[*idx].task.command.clone()
+                        };
+                        return Some(PickerResult {
+                            task_idx: *idx,
+                            command,
+                        });
+                    }
+                }
+                KeyCode::Tab => {
+                    if mode == PickerMode::Select {
+                        // Enter edit mode with current task's command
+                        if let Some((_, PickerItem::Task { idx, .. })) = filtered.get(selected) {
+                            edit_input = all_tasks[*idx].task.command.as_str().into();
+                            // Move cursor to end
+                            edit_input.handle(tui_input::InputRequest::GoToEnd);
+                            mode = PickerMode::Edit;
+                        }
+                    } else {
+                        // Already in edit mode - double-tab expands to script if available
+                        if let Some((_, PickerItem::Task { idx, .. })) = filtered.get(selected) {
+                            if let Some(script) = &all_tasks[*idx].task.script {
+                                edit_input = script.as_str().into();
+                                edit_input.handle(tui_input::InputRequest::GoToEnd);
                             } else {
+                                // No script available, back to select mode
                                 mode = PickerMode::Select;
                             }
-                        }
-                    }
-                    KeyCode::Up => {
-                        if mode == PickerMode::Edit {
+                        } else {
                             mode = PickerMode::Select;
                         }
-                        if selected > 0 {
-                            selected -= 1;
-                            while selected > 0 {
-                                if let PickerItem::Folder { .. } = filtered[selected].1 {
-                                    selected -= 1;
-                                } else {
-                                    break;
-                                }
-                            }
-                        }
                     }
-                    KeyCode::Down => {
-                        if mode == PickerMode::Edit {
-                            mode = PickerMode::Select;
-                        }
-                        if selected + 1 < filtered.len() {
-                            selected += 1;
-                            while selected + 1 < filtered.len() {
-                                if let PickerItem::Folder { .. } = filtered[selected].1 {
-                                    selected += 1;
-                                } else {
-                                    break;
-                                }
-                            }
-                        }
+                }
+                KeyCode::Up => {
+                    if mode == PickerMode::Edit {
+                        mode = PickerMode::Select;
                     }
-                    _ => {
-                        // Convert key event to tui-input request
-                        use tui_input::InputRequest;
-                        let request = match key.code {
-                            KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                Some(InputRequest::GoToStart)
-                            }
-                            KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                Some(InputRequest::GoToEnd)
-                            }
-                            KeyCode::Char('w') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                Some(InputRequest::DeletePrevWord)
-                            }
-                            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                Some(InputRequest::DeleteLine)
-                            }
-                            KeyCode::Char('k') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                Some(InputRequest::DeleteTillEnd)
-                            }
-                            KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                Some(InputRequest::DeleteNextChar)
-                            }
-                            KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                Some(InputRequest::GoToPrevChar)
-                            }
-                            KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                Some(InputRequest::GoToNextChar)
-                            }
-                            KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::ALT) => {
-                                Some(InputRequest::GoToPrevWord)
-                            }
-                            KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::ALT) => {
-                                Some(InputRequest::GoToNextWord)
-                            }
-                            KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::ALT) => {
-                                Some(InputRequest::DeleteNextWord)
-                            }
-                            KeyCode::Left => Some(InputRequest::GoToPrevChar),
-                            KeyCode::Right => Some(InputRequest::GoToNextChar),
-                            KeyCode::Home => Some(InputRequest::GoToStart),
-                            KeyCode::End => Some(InputRequest::GoToEnd),
-                            KeyCode::Backspace => Some(InputRequest::DeletePrevChar),
-                            KeyCode::Delete => Some(InputRequest::DeleteNextChar),
-                            KeyCode::Char(c) => Some(InputRequest::InsertChar(c)),
-                            _ => None,
-                        };
-
-                        if let Some(req) = request {
-                            if mode == PickerMode::Edit {
-                                edit_input.handle(req);
+                    if selected > 0 {
+                        selected -= 1;
+                        while selected > 0 {
+                            if let PickerItem::Folder { .. } = filtered[selected].1 {
+                                selected -= 1;
                             } else {
-                                let prev_value = query_input.value().to_string();
-                                query_input.handle(req);
-                                // Reset selection if query changed
-                                if query_input.value() != prev_value {
-                                    selected = 0;
-                                    scroll_offset = 0;
-                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+                KeyCode::Down => {
+                    if mode == PickerMode::Edit {
+                        mode = PickerMode::Select;
+                    }
+                    if selected + 1 < filtered.len() {
+                        selected += 1;
+                        while selected + 1 < filtered.len() {
+                            if let PickerItem::Folder { .. } = filtered[selected].1 {
+                                selected += 1;
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    // Convert key event to tui-input request
+                    use tui_input::InputRequest;
+                    let request = match key.code {
+                        KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            Some(InputRequest::GoToStart)
+                        }
+                        KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            Some(InputRequest::GoToEnd)
+                        }
+                        KeyCode::Char('w') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            Some(InputRequest::DeletePrevWord)
+                        }
+                        KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            Some(InputRequest::DeleteLine)
+                        }
+                        KeyCode::Char('k') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            Some(InputRequest::DeleteTillEnd)
+                        }
+                        KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            Some(InputRequest::DeleteNextChar)
+                        }
+                        KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            Some(InputRequest::GoToPrevChar)
+                        }
+                        KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            Some(InputRequest::GoToNextChar)
+                        }
+                        KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::ALT) => {
+                            Some(InputRequest::GoToPrevWord)
+                        }
+                        KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::ALT) => {
+                            Some(InputRequest::GoToNextWord)
+                        }
+                        KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::ALT) => {
+                            Some(InputRequest::DeleteNextWord)
+                        }
+                        KeyCode::Left => Some(InputRequest::GoToPrevChar),
+                        KeyCode::Right => Some(InputRequest::GoToNextChar),
+                        KeyCode::Home => Some(InputRequest::GoToStart),
+                        KeyCode::End => Some(InputRequest::GoToEnd),
+                        KeyCode::Backspace => Some(InputRequest::DeletePrevChar),
+                        KeyCode::Delete => Some(InputRequest::DeleteNextChar),
+                        KeyCode::Char(c) => Some(InputRequest::InsertChar(c)),
+                        _ => None,
+                    };
+
+                    if let Some(req) = request {
+                        if mode == PickerMode::Edit {
+                            edit_input.handle(req);
+                        } else {
+                            let prev_value = query_input.value().to_string();
+                            query_input.handle(req);
+                            // Reset selection if query changed
+                            if query_input.value() != prev_value {
+                                selected = 0;
+                                scroll_offset = 0;
                             }
                         }
                     }

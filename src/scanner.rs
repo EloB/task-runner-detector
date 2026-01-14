@@ -22,7 +22,10 @@ pub fn scan(root: impl AsRef<Path>) -> ScanResult<Vec<TaskRunner>> {
 }
 
 /// Scan a directory tree for task runners with custom options
-pub fn scan_with_options(root: impl AsRef<Path>, options: ScanOptions) -> ScanResult<Vec<TaskRunner>> {
+pub fn scan_with_options(
+    root: impl AsRef<Path>,
+    options: ScanOptions,
+) -> ScanResult<Vec<TaskRunner>> {
     let root = root.as_ref();
     let mut runners = Vec::new();
 
