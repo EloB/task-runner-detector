@@ -30,6 +30,9 @@ just = "1"
 # Fuzzy matching
 nucleo-matcher = "0.3"
 
+# Input handling
+tui-input = { version = "0.11", features = ["crossterm"] }
+
 # CLI
 clap = { version = "4", features = ["derive"] }
 console = "0.16"
