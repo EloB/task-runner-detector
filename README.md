@@ -6,6 +6,14 @@ Scans your directory for task runner configs (package.json, Makefile, Cargo.toml
 
 ![demo](https://github.com/user-attachments/assets/cb07b554-fb1f-4c85-9cc9-e76debe19809)
 
+## Why task?
+
+In monorepos and multi-package projects, running tasks becomes tedious. You need to remember package names, navigate between directories, and keep track of which scripts exist where.
+
+**task** solves this by scanning your entire project and presenting every available task in a single, filterable view. No more `cd apps/web && npm run dev` or trying to remember if it was `pnpm --filter @org/api run build` or `yarn workspace api build`.
+
+Just run `task`, type a few characters to filter, and hit enter.
+
 ## Installation
 
 ```bash
