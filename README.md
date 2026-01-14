@@ -22,16 +22,27 @@ task /path/to/project
 # JSON output for scripting
 task --json
 task --json /path/to/project
+
+# Include files/folders ignored by .gitignore
+task --no-ignore
 ```
 
 ### Interactive Mode
 
 The interactive picker shows all discovered tasks organized by folder:
 
-- Type to filter tasks by name, runner, or folder
+- Type to fuzzy-filter tasks by name, runner, or path
 - Use arrow keys to navigate
-- Press Enter to run the selected task
-- Press Esc to cancel
+- Press **Tab** to edit the command before running
+- Press **Tab** again to expand to the actual script content (e.g., expand `npm run build` to `tsc && esbuild...`)
+- Press **Enter** to run the selected task
+- Press **Esc** to cancel
+
+**Readline keybindings in edit mode:**
+- `Ctrl+A` / `Ctrl+E` - Jump to start/end
+- `Ctrl+W` - Delete previous word
+- `Ctrl+U` - Delete line
+- `Ctrl+K` - Delete to end
 
 ## Supported Task Runners
 
