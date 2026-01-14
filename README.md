@@ -9,6 +9,14 @@ Scans your directory for task runner configs (package.json, Makefile, Cargo.toml
 ## Installation
 
 ```bash
+cargo install task-runner-detector
+```
+
+Or from source:
+
+```bash
+git clone https://github.com/elob/task-runner-detector
+cd task-runner-detector
 cargo install --path .
 ```
 
