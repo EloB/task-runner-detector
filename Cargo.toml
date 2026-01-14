@@ -27,6 +27,9 @@ thiserror = "2"
 makefile-lossless = "0.3"
 just = "1"
 
+# Fuzzy matching
+nucleo-matcher = "0.3"
+
 # CLI
 clap = { version = "4", features = ["derive"] }
 console = "0.16"

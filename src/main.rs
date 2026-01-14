@@ -19,6 +19,10 @@ use crossterm::{
     execute,
     terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use nucleo_matcher::{
+    pattern::{CaseMatching, Normalization, Pattern},
+    Matcher,
+};
 
 use task_runner_detector::{scan_with_options, RunnerType, ScanOptions, Task, TaskRunner};
 
@@ -290,17 +294,20 @@ fn run_picker_inner(
     stdout: &mut io::Stdout,
 ) -> Option<usize> {
     let mut query = String::new();
+    let mut cursor: usize = 0;
     let mut selected: usize = 0;
     let mut scroll_offset: usize = 0;
 
+    let mut matcher = Matcher::new(nucleo_matcher::Config::DEFAULT);
+
     loop {
-        // Filter items based on query
+        // Filter items based on query using fuzzy matching
         let filtered: Vec<(usize, &PickerItem)> = if query.is_empty() {
             items.iter().enumerate().collect()
         } else {
-            let query_lower = query.to_lowercase();
+            let pattern = Pattern::parse(&query, CaseMatching::Ignore, Normalization::Smart);
 
-            // First, find which tasks match
+            // First, find which tasks match with fuzzy matching
             let matching_tasks: Vec<usize> = items
                 .iter()
                 .filter_map(|item| {
@@ -311,9 +318,10 @@ fn run_picker_inner(
                             task.task.name,
                             task.runner.display_name(),
                             folder_key(task, root)
-                        )
-                        .to_lowercase();
-                        if search_text.contains(&query_lower) {
+                        );
+                        let mut buf = Vec::new();
+                        let haystack = nucleo_matcher::Utf32Str::new(&search_text, &mut buf);
+                        if pattern.score(haystack, &mut matcher).is_some() {
                             return Some(*idx);
                         }
                     }
@@ -501,8 +509,12 @@ fn run_picker_inner(
         output.push_str(&format!("\x1b[90m  {} tasks found\x1b[0m\x1b[K\r\n", all_tasks.len()));
         output.push_str("\x1b[K\r\n");
 
-        // Input line
-        output.push_str(&format!("\x1b[36m❯ \x1b[0m{}█\x1b[K\r\n", query));
+        // Input line with cursor
+        let (before_cursor, after_cursor) = query.split_at(cursor);
+        output.push_str(&format!(
+            "\x1b[36m❯ \x1b[0m{}█{}\x1b[K\r\n",
+            before_cursor, after_cursor
+        ));
         output.push_str("\x1b[K\r\n");
 
         // Render sticky ancestor headers (using same tree logic as normal rendering)
@@ -718,15 +730,29 @@ fn run_picker_inner(
                 KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                     return None;
                 }
+                KeyCode::Left => {
+                    if cursor > 0 {
+                        cursor -= 1;
+                    }
+                }
+                KeyCode::Right => {
+                    if cursor < query.len() {
+                        cursor += 1;
+                    }
+                }
                 KeyCode::Char(c) => {
-                    query.push(c);
+                    query.insert(cursor, c);
+                    cursor += 1;
                     selected = 0;
                     scroll_offset = 0;
                 }
                 KeyCode::Backspace => {
-                    query.pop();
-                    selected = 0;
-                    scroll_offset = 0;
+                    if cursor > 0 {
+                        cursor -= 1;
+                        query.remove(cursor);
+                        selected = 0;
+                        scroll_offset = 0;
+                    }
                 }
                 _ => {}
             }
