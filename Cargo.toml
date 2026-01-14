@@ -55,13 +55,5 @@ codegen-units = 1
 tag-prefix = "v"
 tag-message = "Release {{version}}"
 pre-release-commit-message = "chore: release {{version}}"
-pre-release-hook = ["cargo", "test", "--", "--quiet"]
-pre-release-replacements = []
-
-# Run these checks before releasing
-[[package.metadata.release.pre-release-hooks]]
-command = ["cargo", "fmt", "--check"]
-[[package.metadata.release.pre-release-hooks]]
-command = ["cargo", "clippy", "--", "-D", "warnings"]
-[[package.metadata.release.pre-release-hooks]]
-command = ["cargo", "test"]
+# Run fmt check, clippy, and tests before releasing
+pre-release-hook = ["sh", "-c", "cargo fmt --check && cargo clippy -- -D warnings && cargo test"]
