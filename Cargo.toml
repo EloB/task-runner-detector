@@ -52,7 +52,7 @@ strip = true
 codegen-units = 1
 
 [package.metadata.release]
-tag-prefix = "v"
+tag-prefix = ""
 tag-message = "Release {{version}}"
 pre-release-commit-message = "chore: release {{version}}"
 # Run fmt check, clippy, and tests before releasing
