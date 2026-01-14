@@ -380,7 +380,51 @@ fn run_picker_inner(
 
         // Get terminal size
         let (_width, height) = terminal::size().unwrap_or((80, 24));
-        let list_height = (height as usize).saturating_sub(8);
+        let base_list_height = (height as usize).saturating_sub(8);
+
+        // Find sticky ancestor folders for current scroll position
+        // These are folders that are ancestors of visible items but scrolled out of view
+        // Returns (filtered_index, &PickerItem) so we can compute tree structure
+        fn find_sticky_ancestors<'a>(
+            filtered: &'a [(usize, &'a PickerItem)],
+            scroll_offset: usize,
+        ) -> Vec<(usize, &'a PickerItem)> {
+            if scroll_offset == 0 || filtered.is_empty() {
+                return vec![];
+            }
+
+            // Get the first visible item
+            let first_visible = &filtered[scroll_offset].1;
+            let first_depth = match first_visible {
+                PickerItem::Folder { original_depth, .. } => *original_depth,
+                PickerItem::Task { depth, .. } => *depth,
+            };
+
+            if first_depth == 0 {
+                return vec![];
+            }
+
+            // Find ancestor folders at each depth level that are before scroll_offset
+            let mut ancestors: Vec<(usize, &PickerItem)> = Vec::new();
+            for target_depth in 0..first_depth {
+                // Walk backwards from scroll_offset to find the folder at this depth
+                for i in (0..scroll_offset).rev() {
+                    let item = filtered[i].1;
+                    if let PickerItem::Folder { original_depth, .. } = item {
+                        if *original_depth == target_depth {
+                            ancestors.push((i, item));
+                            break;
+                        }
+                    }
+                }
+            }
+
+            ancestors
+        }
+
+        let sticky_ancestors = find_sticky_ancestors(&filtered, scroll_offset);
+        let sticky_count = sticky_ancestors.len();
+        let list_height = base_list_height.saturating_sub(sticky_count);
 
         // Adjust scroll offset
         if selected < scroll_offset {
@@ -389,27 +433,10 @@ fn run_picker_inner(
             scroll_offset = selected - list_height + 1;
         }
 
-        // Build output buffer - use \x1b[K to clear to end of line instead of full screen clear
-        let mut output = String::new();
-
-        // Move to top (no full screen clear to avoid flicker)
-        execute!(stdout, MoveTo(0, 0)).ok();
-
-        // Header - \x1b[K clears from cursor to end of line
-        output.push_str("\x1b[36m  Task Runner Detector\x1b[0m\x1b[K\r\n");
-        output.push_str(&format!("\x1b[90m  {} tasks found\x1b[0m\x1b[K\r\n", all_tasks.len()));
-        output.push_str("\x1b[K\r\n");
-
-        // Input line
-        output.push_str(&format!("\x1b[36m❯ \x1b[0m{}█\x1b[K\r\n", query));
-        output.push_str("\x1b[K\r\n");
-
-        // List items
-        let visible_items: Vec<_> = filtered
-            .iter()
-            .skip(scroll_offset)
-            .take(list_height)
-            .collect();
+        // Recompute sticky ancestors after scroll adjustment
+        let sticky_ancestors = find_sticky_ancestors(&filtered, scroll_offset);
+        let sticky_count = sticky_ancestors.len();
+        let list_height = base_list_height.saturating_sub(sticky_count);
 
         // Helper to get depth of an item
         fn item_depth(item: &PickerItem) -> usize {
@@ -462,6 +489,53 @@ fn run_picker_inner(
 
             parent_lasts
         }
+
+        // Build output buffer - use \x1b[K to clear to end of line instead of full screen clear
+        let mut output = String::new();
+
+        // Move to top (no full screen clear to avoid flicker)
+        execute!(stdout, MoveTo(0, 0)).ok();
+
+        // Header - \x1b[K clears from cursor to end of line
+        output.push_str("\x1b[36m  Task Runner Detector\x1b[0m\x1b[K\r\n");
+        output.push_str(&format!("\x1b[90m  {} tasks found\x1b[0m\x1b[K\r\n", all_tasks.len()));
+        output.push_str("\x1b[K\r\n");
+
+        // Input line
+        output.push_str(&format!("\x1b[36m❯ \x1b[0m{}█\x1b[K\r\n", query));
+        output.push_str("\x1b[K\r\n");
+
+        // Render sticky ancestor headers (using same tree logic as normal rendering)
+        for (filtered_idx, ancestor) in &sticky_ancestors {
+            if let PickerItem::Folder { name, is_root, .. } = ancestor {
+                if *is_root {
+                    output.push_str(&format!("  📁 \x1b[1;37m{}\x1b[0m\x1b[K\r\n", name));
+                } else {
+                    // Use the same tree structure computation as normal folders
+                    let is_last = is_last_in_filtered(&filtered, *filtered_idx);
+                    let parent_lasts = compute_filtered_parent_lasts(&filtered, *filtered_idx);
+
+                    let mut prefix = String::from("  ");
+                    for &parent_is_last in parent_lasts.iter() {
+                        if parent_is_last {
+                            prefix.push_str("   ");
+                        } else {
+                            prefix.push_str("│  ");
+                        }
+                    }
+
+                    let branch = if is_last { "└─" } else { "├─" };
+                    output.push_str(&format!("\x1b[90m{}{}\x1b[0m 📁 \x1b[1;37m{}\x1b[0m\x1b[K\r\n", prefix, branch, name));
+                }
+            }
+        }
+
+        // List items
+        let visible_items: Vec<_> = filtered
+            .iter()
+            .skip(scroll_offset)
+            .take(list_height)
+            .collect();
 
         for (i, (_, item)) in visible_items.iter().enumerate() {
             let is_selected = scroll_offset + i == selected;
