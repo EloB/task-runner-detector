@@ -332,8 +332,9 @@ fn run_picker_inner(
                     if let PickerItem::Task { idx, .. } = item {
                         let task = &all_tasks[*idx];
                         let search_text = format!(
-                            "{} {} {}",
+                            "{} {} {} {}",
                             task.task.name,
+                            task.task.command,
                             task.runner.display_name(),
                             folder_key(task, root)
                         );
