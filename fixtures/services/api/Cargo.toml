@@ -11,7 +11,5 @@ name = "migrate"
 
 [package.metadata.scripts]
 dev = "echo Recompiling on changes..."
-db:up = "echo Starting PostgreSQL..."
-db:down = "echo Stopping database..."
 
 [dependencies]
