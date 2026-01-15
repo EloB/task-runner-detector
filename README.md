@@ -17,9 +17,14 @@ Just run `task`, type a few characters to filter, and hit enter.
 ## Installation
 
 ```bash
-brew install elob/tap/task-runner-detector   # Homebrew (macOS/Linux)
-cargo install task-runner-detector            # Cargo
-npm install -g task-runner-detector           # npm
+# Cargo
+cargo install task-runner-detector
+
+# Homebrew
+brew install elob/tap/task-runner-detector
+
+# npm
+npm install -g task-runner-detector
 ```
 
 <details>
