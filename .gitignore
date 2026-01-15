@@ -4,3 +4,18 @@
 *.swo
 .idea/
 .vscode/
+
+# .NET build artifacts
+**/bin/
+**/obj/
+
+# Turbo cache
+.turbo/
+
+# Python
+.pdm-python
+.venv/
+__pycache__/
+
+# Claude Code local settings
+.claude/settings.local.json

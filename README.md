@@ -102,6 +102,8 @@ The interactive picker shows all discovered tasks organized by folder:
 | Poetry | `pyproject.toml` | Poetry scripts |
 | PDM | `pyproject.toml` | PDM scripts |
 | Flutter/Dart | `pubspec.yaml` | Custom scripts |
+| Maven | `pom.xml` | Lifecycle phases, profiles |
+| .NET | `*.csproj` | dotnet CLI commands, MSBuild targets |
 
 ## Library Usage
 

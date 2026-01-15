@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <!-- Minimal Program.cs will be created alongside -->
+
+  <Target Name="GenerateClient" AfterTargets="Build">
+    <Message Text="Generating API client..." Importance="high" />
+  </Target>
+
+  <Target Name="Echo" AfterTargets="Build">
+    <Exec Command="echo Running dotnet build..." />
+  </Target>
+
+</Project>

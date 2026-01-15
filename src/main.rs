@@ -626,10 +626,10 @@ fn handle_key(state: AppState, key: KeyEvent, derived: &DerivedState) -> UpdateR
                     // No script to expand, stay in Edit mode
                     UpdateResult::Continue(state)
                 }
-                Mode::Expanded => UpdateResult::Continue(AppState {
-                    mode: Mode::Select,
-                    ..state
-                }),
+                Mode::Expanded => {
+                    // Tab disabled in expanded mode for now
+                    UpdateResult::Continue(state)
+                }
             }
         }
 
@@ -688,15 +688,22 @@ fn handle_key(state: AppState, key: KeyEvent, derived: &DerivedState) -> UpdateR
     }
 }
 
-/// Move selection, skipping folders
+/// Move selection, skipping folders, with wrap-around
 fn move_selection(current: usize, filtered: &[PickerItem], delta: isize) -> usize {
-    let mut pos = current as isize + delta;
-    while pos >= 0 && (pos as usize) < filtered.len() {
-        if matches!(filtered[pos as usize], PickerItem::Task { .. }) {
-            return pos as usize;
-        }
-        pos += delta;
+    let len = filtered.len();
+    if len == 0 {
+        return current;
     }
+
+    let mut pos = current;
+    for _ in 0..len {
+        // Wrap around using modulo
+        pos = ((pos as isize + delta).rem_euclid(len as isize)) as usize;
+        if matches!(filtered[pos], PickerItem::Task { .. }) {
+            return pos;
+        }
+    }
+
     current
 }
 
