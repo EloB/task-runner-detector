@@ -93,6 +93,13 @@ pub fn scan_streaming(
                         Some(Box::new(parsers::JustfileParser))
                     }
                     "deno.json" | "deno.jsonc" => Some(Box::new(parsers::DenoJsonParser)),
+                    "pom.xml" => Some(Box::new(parsers::PomXmlParser)),
+                    name if name.ends_with(".csproj")
+                        || name.ends_with(".fsproj")
+                        || name.ends_with(".vbproj") =>
+                    {
+                        Some(Box::new(parsers::CsprojParser))
+                    }
                     _ => None,
                 };
 

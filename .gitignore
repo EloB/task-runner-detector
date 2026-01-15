@@ -4,3 +4,10 @@
 *.swo
 .idea/
 .vscode/
+
+# .NET build artifacts
+**/bin/
+**/obj/
+
+# Turbo cache
+.turbo/

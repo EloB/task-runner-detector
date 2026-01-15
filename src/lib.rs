@@ -42,6 +42,8 @@ pub enum RunnerType {
     Pdm,
     Just,
     Deno,
+    Maven,
+    DotNet,
 }
 
 impl RunnerType {
@@ -61,6 +63,8 @@ impl RunnerType {
             RunnerType::Pdm => "pdm",
             RunnerType::Just => "just",
             RunnerType::Deno => "deno",
+            RunnerType::Maven => "mvn",
+            RunnerType::DotNet => "dotnet",
         }
     }
 
@@ -80,6 +84,8 @@ impl RunnerType {
             RunnerType::Pdm => "🐍",
             RunnerType::Just => "📜",
             RunnerType::Deno => "🦕",
+            RunnerType::Maven => "🪶",
+            RunnerType::DotNet => "🟣",
         }
     }
 
@@ -99,6 +105,8 @@ impl RunnerType {
             RunnerType::Pdm => 2,     // Green
             RunnerType::Just => 3,    // Yellow
             RunnerType::Deno => 2,    // Green
+            RunnerType::Maven => 1,   // Red
+            RunnerType::DotNet => 5,  // Magenta
         }
     }
 }
