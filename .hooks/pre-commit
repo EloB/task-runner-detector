@@ -1,0 +1,6 @@
+#!/bin/sh
+# Pre-commit hook - runs on every commit
+# Edit this file to change what checks run
+
+cargo fmt --check || exit 1
+cargo clippy -- -D warnings || exit 1

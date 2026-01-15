@@ -217,7 +217,10 @@ mod tests {
         let parser = CsprojParser;
         let runner = parser.parse(&path).unwrap().unwrap();
 
-        assert!(runner.tasks.iter().any(|t| t.name == "msbuild:GenerateCode"));
+        assert!(runner
+            .tasks
+            .iter()
+            .any(|t| t.name == "msbuild:GenerateCode"));
         assert!(runner.tasks.iter().any(|t| t.name == "msbuild:Deploy"));
     }
 }
