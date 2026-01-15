@@ -23,7 +23,7 @@ mod scanner;
 use std::path::PathBuf;
 use thiserror::Error;
 
-pub use scanner::{scan, scan_with_options, ScanOptions};
+pub use scanner::{scan, scan_streaming, scan_with_options, ScanOptions};
 
 /// The type of task runner detected
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
