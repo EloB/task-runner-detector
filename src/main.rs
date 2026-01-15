@@ -626,10 +626,10 @@ fn handle_key(state: AppState, key: KeyEvent, derived: &DerivedState) -> UpdateR
                     // No script to expand, stay in Edit mode
                     UpdateResult::Continue(state)
                 }
-                Mode::Expanded => UpdateResult::Continue(AppState {
-                    mode: Mode::Select,
-                    ..state
-                }),
+                Mode::Expanded => {
+                    // Tab disabled in expanded mode for now
+                    UpdateResult::Continue(state)
+                }
             }
         }
 
