@@ -11,3 +11,8 @@
 
 # Turbo cache
 .turbo/
+
+# Python
+.pdm-python
+.venv/
+__pycache__/
