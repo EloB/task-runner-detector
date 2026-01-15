@@ -1,10 +1,12 @@
 //! Task CLI - Discover and run tasks from various config files
 //!
 //! Usage:
-//!   task              # Interactive wizard (scan cwd, select, run)
-//!   task <path>       # Interactive wizard for specific directory
-//!   task --json       # JSON output for cwd
-//!   task --json <path>  # JSON output for specific directory
+//!   task                    # Interactive picker (scan cwd, select, run)
+//!   task <path>             # Interactive picker for specific directory
+//!   task -j                 # JSON output
+//!   task -s                 # Streaming NDJSON output
+//!   task -j -q "query"      # Filter JSON output with fuzzy search
+//!   task -i                 # Include files ignored by .gitignore
 
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -104,13 +106,13 @@ enum PickerItem {
     },
 }
 
-/// Normalized state structure (like Redux):
+/// Normalized application state
 /// - `tasks_by_id`: HashMap for O(1) lookups
-/// - `task_ids`: Vec preserving insertion order (allIds)
+/// - `task_ids`: Vec preserving insertion order
 /// - `folder_ids`: Vec preserving folder discovery order
 #[derive(Clone)]
 struct AppState {
-    // Normalized task storage (byId + allIds pattern)
+    // Normalized task storage
     tasks_by_id: HashMap<TaskId, DisplayTask>,
     task_ids: Vec<TaskId>, // Maintains insertion order
 

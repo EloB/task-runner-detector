@@ -1571,7 +1571,7 @@ checksum = "1e8f05f774b2db35bdad5a8237a90be1102669f8ea013fea9777b366d34ab145"
 
 [[package]]
 name = "task-runner-detector"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "console",
