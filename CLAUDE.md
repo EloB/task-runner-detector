@@ -54,6 +54,8 @@ This is a Rust CLI tool that scans directories for task runner configuration fil
   - `pubspec_yaml.rs` - Flutter/Dart scripts
   - `justfile.rs` - Just command runner
   - `deno_json.rs` - Deno tasks
+  - `pom_xml.rs` - Maven lifecycle phases and profiles
+  - `csproj.rs` - .NET CLI commands and MSBuild targets
 
 ### Parser Pattern
 
@@ -68,6 +70,11 @@ Return `Ok(None)` if the file has no relevant tasks, `Ok(Some(TaskRunner))` on s
 
 ### Key Types
 
-- `RunnerType`: Enum for each supported task runner (Npm, Bun, Cargo, Make, etc.)
+- `RunnerType`: Enum for each supported task runner (Npm, Bun, Cargo, Make, Maven, DotNet, etc.)
 - `Task`: Contains `name`, `command`, and optional `description`
 - `TaskRunner`: Groups tasks with their `config_path` and `runner_type`
+
+### Tests
+
+- **Unit tests**: In each parser module, run with `cargo test`
+- **Integration tests**: `tests/interactive.rs` uses PTY simulation to test the interactive picker
