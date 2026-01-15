@@ -16,11 +16,37 @@ Just run `task`, type a few characters to filter, and hit enter.
 
 ## Installation
 
+### Homebrew (macOS/Linux)
+
+```bash
+brew install elob/tap/task-runner-detector
+```
+
+### Shell (macOS/Linux)
+
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/elob/task-runner-detector/releases/latest/download/task-runner-detector-installer.sh | sh
+```
+
+### PowerShell (Windows)
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://github.com/elob/task-runner-detector/releases/latest/download/task-runner-detector-installer.ps1 | iex"
+```
+
+### npm
+
+```bash
+npm install -g task-runner-detector
+```
+
+### Cargo
+
 ```bash
 cargo install task-runner-detector
 ```
 
-Or from source:
+### From source
 
 ```bash
 git clone https://github.com/elob/task-runner-detector
