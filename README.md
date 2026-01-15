@@ -16,43 +16,31 @@ Just run `task`, type a few characters to filter, and hit enter.
 
 ## Installation
 
-### Homebrew (macOS/Linux)
-
 ```bash
-brew install elob/tap/task-runner-detector
+brew install elob/tap/task-runner-detector   # Homebrew (macOS/Linux)
+cargo install task-runner-detector            # Cargo
+npm install -g task-runner-detector           # npm
 ```
 
-### Shell (macOS/Linux)
+<details>
+<summary>More installation options</summary>
 
+**Shell (macOS/Linux):**
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/elob/task-runner-detector/releases/latest/download/task-runner-detector-installer.sh | sh
 ```
 
-### PowerShell (Windows)
-
+**PowerShell (Windows):**
 ```powershell
 powershell -ExecutionPolicy ByPass -c "irm https://github.com/elob/task-runner-detector/releases/latest/download/task-runner-detector-installer.ps1 | iex"
 ```
 
-### npm
-
+**From source:**
 ```bash
-npm install -g task-runner-detector
+git clone https://github.com/elob/task-runner-detector && cd task-runner-detector && cargo install --path .
 ```
 
-### Cargo
-
-```bash
-cargo install task-runner-detector
-```
-
-### From source
-
-```bash
-git clone https://github.com/elob/task-runner-detector
-cd task-runner-detector
-cargo install --path .
-```
+</details>
 
 ## Usage
 
