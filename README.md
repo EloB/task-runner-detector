@@ -57,23 +57,31 @@ task
 task /path/to/project
 
 # JSON output for scripting
-task --json
+task --json          # or -j
 task --json /path/to/project
 
+# Streaming NDJSON output (outputs results as they're found)
+task --json-stream   # or -s
+
+# Filter with fuzzy search (works with --json and --json-stream)
+task -j -q "npm dev"
+task -s -q "^cargo"  # prefix match
+
 # Include files/folders ignored by .gitignore
-task --no-ignore
+task --no-ignore     # or -i
 ```
 
 ### Interactive Mode
 
 The interactive picker shows all discovered tasks organized by folder:
 
-- Type to fuzzy-filter tasks by name, runner, or path
+- Type to fuzzy-filter tasks by name, runner, or path (matched characters are highlighted)
 - Use arrow keys to navigate
 - Press **Tab** to edit the command before running
 - Press **Tab** again to expand to the actual script content (e.g., expand `npm run build` to `tsc && esbuild...`)
+- Press **Tab** again to return to selection mode
 - Press **Enter** to run the selected task
-- Press **Esc** to cancel
+- Press **Esc** to go back (Expanded → Edit → Select → Exit)
 
 **Readline keybindings in edit mode:**
 - `Ctrl+A` / `Ctrl+E` - Jump to start/end

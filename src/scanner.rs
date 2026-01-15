@@ -1,8 +1,10 @@
 //! Directory scanner for task runner config files
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::mpsc::Sender;
+use std::thread::{self, JoinHandle};
 
-use ignore::WalkBuilder;
+use ignore::{WalkBuilder, WalkState};
 
 use crate::parsers::{self, Parser};
 use crate::{ScanResult, TaskRunner};
@@ -21,70 +23,91 @@ pub fn scan(root: impl AsRef<Path>) -> ScanResult<Vec<TaskRunner>> {
     scan_with_options(root, ScanOptions::default())
 }
 
-/// Scan a directory tree for task runners with custom options
+/// Scan a directory tree for task runners with custom options.
+/// Uses scan_streaming internally and collects results.
 pub fn scan_with_options(
     root: impl AsRef<Path>,
     options: ScanOptions,
 ) -> ScanResult<Vec<TaskRunner>> {
-    let root = root.as_ref();
-    let mut runners = Vec::new();
+    use std::sync::mpsc;
 
-    let mut builder = WalkBuilder::new(root);
-    builder.follow_links(false);
-    builder.standard_filters(!options.no_ignore);
+    let root = root.as_ref().to_path_buf();
+    let (tx, rx) = mpsc::channel();
 
-    if let Some(max_depth) = options.max_depth {
-        builder.max_depth(Some(max_depth));
-    }
+    let handle = scan_streaming(root, options, tx);
 
-    for result in builder.build() {
-        let entry = result?;
+    // Collect all results
+    let runners: Vec<TaskRunner> = rx.into_iter().collect();
 
-        // Only process files
-        let is_file = entry.file_type().map(|ft| ft.is_file()).unwrap_or(false);
-        if !is_file {
-            continue;
-        }
-
-        let path = entry.path();
-        let file_name = match path.file_name() {
-            Some(name) => name.to_string_lossy(),
-            None => continue,
-        };
-
-        // Match config files and parse them
-        let parser: Option<Box<dyn Parser>> = match file_name.as_ref() {
-            "package.json" => Some(Box::new(parsers::PackageJsonParser)),
-            "Makefile" | "makefile" | "GNUmakefile" => Some(Box::new(parsers::MakefileParser)),
-            "Cargo.toml" => Some(Box::new(parsers::CargoTomlParser)),
-            "pubspec.yaml" => Some(Box::new(parsers::PubspecYamlParser)),
-            "turbo.json" => Some(Box::new(parsers::TurboJsonParser)),
-            "pyproject.toml" => Some(Box::new(parsers::PyprojectTomlParser)),
-            "justfile" | "Justfile" | ".justfile" => Some(Box::new(parsers::JustfileParser)),
-            "deno.json" | "deno.jsonc" => Some(Box::new(parsers::DenoJsonParser)),
-            _ => None,
-        };
-
-        if let Some(parser) = parser {
-            match parser.parse(path) {
-                Ok(Some(runner)) => {
-                    // Only add if there are tasks
-                    if !runner.tasks.is_empty() {
-                        runners.push(runner);
-                    }
-                }
-                Ok(None) => {
-                    // Parser decided this file doesn't have relevant tasks
-                }
-                Err(e) => {
-                    // Log but don't fail on parse errors - continue scanning
-                    eprintln!("Warning: Failed to parse {}: {}", path.display(), e);
-                }
-            }
-        }
-    }
+    // Wait for scanner to finish
+    handle.join().ok();
 
     Ok(runners)
+}
+
+/// Scan a directory tree for task runners, streaming results through a channel.
+/// Uses parallel walking for better performance on large directories.
+/// Returns a JoinHandle that completes when scanning is done.
+pub fn scan_streaming(
+    root: PathBuf,
+    options: ScanOptions,
+    tx: Sender<TaskRunner>,
+) -> JoinHandle<()> {
+    thread::spawn(move || {
+        let mut builder = WalkBuilder::new(&root);
+        builder.follow_links(false);
+        builder.standard_filters(!options.no_ignore);
+
+        if let Some(max_depth) = options.max_depth {
+            builder.max_depth(Some(max_depth));
+        }
+
+        builder.build_parallel().run(|| {
+            let tx = tx.clone();
+            Box::new(move |result| {
+                let entry = match result {
+                    Ok(e) => e,
+                    Err(_) => return WalkState::Continue,
+                };
+
+                if !entry.file_type().map(|ft| ft.is_file()).unwrap_or(false) {
+                    return WalkState::Continue;
+                }
+
+                let path = entry.path();
+                let file_name = match path.file_name() {
+                    Some(name) => name.to_string_lossy(),
+                    None => return WalkState::Continue,
+                };
+
+                let parser: Option<Box<dyn Parser>> = match file_name.as_ref() {
+                    "package.json" => Some(Box::new(parsers::PackageJsonParser)),
+                    "Makefile" | "makefile" | "GNUmakefile" => {
+                        Some(Box::new(parsers::MakefileParser))
+                    }
+                    "Cargo.toml" => Some(Box::new(parsers::CargoTomlParser)),
+                    "pubspec.yaml" => Some(Box::new(parsers::PubspecYamlParser)),
+                    "turbo.json" => Some(Box::new(parsers::TurboJsonParser)),
+                    "pyproject.toml" => Some(Box::new(parsers::PyprojectTomlParser)),
+                    "justfile" | "Justfile" | ".justfile" => {
+                        Some(Box::new(parsers::JustfileParser))
+                    }
+                    "deno.json" | "deno.jsonc" => Some(Box::new(parsers::DenoJsonParser)),
+                    _ => None,
+                };
+
+                if let Some(parser) = parser {
+                    if let Ok(Some(runner)) = parser.parse(path) {
+                        if !runner.tasks.is_empty() && tx.send(runner).is_err() {
+                            return WalkState::Quit;
+                        }
+                    }
+                }
+
+                WalkState::Continue
+            })
+        });
+    })
 }
 
 #[cfg(test)]

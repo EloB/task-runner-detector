@@ -30,7 +30,6 @@ ignore = "0.4"
 thiserror = "2"
 
 # Parsing
-makefile-lossless = "0.3"
 just = "1"
 
 # Fuzzy matching

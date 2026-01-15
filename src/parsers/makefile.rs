@@ -1,9 +1,7 @@
-//! Parser for Makefile targets using makefile-lossless
+//! Simple parser for Makefile targets (thread-safe, no external deps)
 
 use std::fs;
 use std::path::Path;
-
-use makefile_lossless::Makefile;
 
 use crate::{RunnerType, ScanError, Task, TaskRunner};
 
@@ -14,38 +12,59 @@ pub struct MakefileParser;
 impl MakefileParser {
     /// Check if a target name should be exposed as a runnable task
     fn is_runnable_target(name: &str) -> bool {
-        // Skip special targets and internal targets
         !name.starts_with('.') && !name.starts_with('_') && !name.contains('%') && !name.is_empty()
+    }
+
+    /// Parse targets from makefile content
+    fn parse_targets(content: &str) -> Vec<String> {
+        let mut targets = Vec::new();
+        for line in content.lines() {
+            // Skip empty lines, comments, and lines starting with whitespace (recipes)
+            let trimmed = line.trim_start();
+            if trimmed.is_empty()
+                || trimmed.starts_with('#')
+                || line.starts_with('\t')
+                || line.starts_with(' ')
+            {
+                continue;
+            }
+            // Look for target definitions: "target:" or "target: deps"
+            if let Some(colon_pos) = line.find(':') {
+                // Skip := and ::= (variable assignments)
+                if line[colon_pos..].starts_with(":=") || line[colon_pos..].starts_with("::=") {
+                    continue;
+                }
+                let target_part = &line[..colon_pos];
+                // Handle multiple targets on same line: "foo bar: deps"
+                for target in target_part.split_whitespace() {
+                    if Self::is_runnable_target(target) && !targets.contains(&target.to_string()) {
+                        targets.push(target.to_string());
+                    }
+                }
+            }
+        }
+        targets
     }
 }
 
 impl Parser for MakefileParser {
     fn parse(&self, path: &Path) -> Result<Option<TaskRunner>, ScanError> {
         let content = fs::read_to_string(path)?;
+        let targets = Self::parse_targets(&content);
 
-        let makefile: Makefile = content.parse().map_err(|e| ScanError::ParseError {
-            path: path.to_path_buf(),
-            message: format!("{:?}", e),
-        })?;
-
-        let mut tasks = Vec::new();
-
-        for rule in makefile.rules() {
-            for target in rule.targets() {
-                if Self::is_runnable_target(&target) {
-                    tasks.push(Task {
-                        name: target.clone(),
-                        command: format!("make {}", target),
-                        description: None, // makefile-lossless doesn't expose comments
-                        script: None,      // Makefile recipes not easily extractable
-                    });
-                }
-            }
-        }
-
-        if tasks.is_empty() {
+        if targets.is_empty() {
             return Ok(None);
         }
+
+        let tasks = targets
+            .into_iter()
+            .map(|name| Task {
+                command: format!("make {}", name),
+                name,
+                description: None,
+                script: None,
+            })
+            .collect();
 
         Ok(Some(TaskRunner {
             config_path: path.to_path_buf(),
