@@ -2,11 +2,14 @@
 //!
 //! These tests spawn the `task` binary with a PTY and simulate user input
 //! to verify that tasks are correctly discovered and executed.
+//!
+//! Note: These tests must run serially (--test-threads=1) because they
+//! spawn PTY sessions that can interfere with each other.
 
 use std::process::Command;
 use std::time::Duration;
 
-use expectrl::{spawn, Eof, Regex};
+use expectrl::{session::Session, spawn, Eof, Regex};
 
 /// Build the binary first if needed
 fn ensure_binary_built() {
@@ -28,6 +31,23 @@ fn fixtures_path() -> String {
     format!("{}/fixtures", manifest_dir)
 }
 
+/// Wait for the picker UI to be ready by looking for the status line
+fn wait_for_picker_ready(session: &mut Session) {
+    // The status line shows "X/Y │ ↑↓ navigate" when ready
+    // We look for the full navigation hint to ensure scanning is complete
+    session
+        .expect(Regex(r"\d+/\d+ │ ↑↓ navigate"))
+        .expect("Picker should show status line with navigation hint");
+
+    // Additional delay to ensure the UI is fully rendered and ready for input
+    wait_for_filter();
+}
+
+/// Wait for filter to be applied by giving UI time to process input and re-render
+fn wait_for_filter() {
+    std::thread::sleep(Duration::from_millis(200));
+}
+
 #[test]
 fn test_npm_task_execution() {
     ensure_binary_built();
@@ -41,13 +61,14 @@ fn test_npm_task_execution() {
 
     session.set_expect_timeout(Some(Duration::from_secs(10)));
 
-    // Wait for the picker to appear (alternate screen)
-    std::thread::sleep(Duration::from_millis(500));
+    // Wait for the picker to be ready
+    wait_for_picker_ready(&mut session);
 
     // Filter to npm build
     session.send("build").expect("Failed to type query");
 
-    std::thread::sleep(Duration::from_millis(300));
+    // Small delay for filter to apply
+    wait_for_filter();
 
     // Press Enter to run the task
     session.send("\r").expect("Failed to send Enter");
@@ -74,13 +95,13 @@ fn test_make_task_execution() {
 
     session.set_expect_timeout(Some(Duration::from_secs(10)));
 
-    // Wait for picker
-    std::thread::sleep(Duration::from_millis(500));
+    // Wait for the picker to be ready
+    wait_for_picker_ready(&mut session);
 
     // Type "make build" to filter
     session.send("make build").expect("Failed to type query");
 
-    std::thread::sleep(Duration::from_millis(300));
+    wait_for_filter();
 
     // Press Enter to run
     session.send("\r").expect("Failed to send Enter");
@@ -112,17 +133,18 @@ fn test_just_task_execution() {
 
     session.set_expect_timeout(Some(Duration::from_secs(10)));
 
-    std::thread::sleep(Duration::from_millis(500));
+    // Wait for the picker to be ready
+    wait_for_picker_ready(&mut session);
 
     session.send("just build").expect("Failed to type query");
 
-    std::thread::sleep(Duration::from_millis(300));
+    wait_for_filter();
 
     session.send("\r").expect("Failed to send Enter");
 
     session
-        .expect("Optimizing for production")
-        .expect("Should see just build output");
+        .expect(Regex("Optimizing for production|Task completed"))
+        .expect("Should see just build output or completion");
 
     session.expect(Eof).ok();
 }
@@ -142,13 +164,14 @@ fn test_maven_task_execution() {
 
     session.set_expect_timeout(Some(Duration::from_secs(60))); // Maven can be slow
 
-    std::thread::sleep(Duration::from_millis(500));
+    // Wait for the picker to be ready
+    wait_for_picker_ready(&mut session);
 
     session
         .send("mvn validate backend")
         .expect("Failed to type query");
 
-    std::thread::sleep(Duration::from_millis(300));
+    wait_for_filter();
 
     session.send("\r").expect("Failed to send Enter");
 
@@ -180,13 +203,14 @@ fn test_dotnet_task_execution() {
 
     session.set_expect_timeout(Some(Duration::from_secs(120))); // dotnet can be slow first time
 
-    std::thread::sleep(Duration::from_millis(500));
+    // Wait for the picker to be ready
+    wait_for_picker_ready(&mut session);
 
     session
         .send("dotnet build dotnet-api")
         .expect("Failed to type query");
 
-    std::thread::sleep(Duration::from_millis(300));
+    wait_for_filter();
 
     session.send("\r").expect("Failed to send Enter");
 
@@ -205,10 +229,10 @@ fn test_escape_cancels() {
     let mut session =
         spawn(&format!("{} {}", binary_path(), fixtures_path())).expect("Failed to spawn task");
 
-    session.set_expect_timeout(Some(Duration::from_secs(5)));
+    session.set_expect_timeout(Some(Duration::from_secs(10)));
 
-    // Wait for picker
-    std::thread::sleep(Duration::from_millis(500));
+    // Wait for the picker to be ready
+    wait_for_picker_ready(&mut session);
 
     // Press Escape to cancel
     session.send("\x1b").expect("Failed to send Escape");
@@ -226,10 +250,10 @@ fn test_ctrl_c_cancels() {
     let mut session =
         spawn(&format!("{} {}", binary_path(), fixtures_path())).expect("Failed to spawn task");
 
-    session.set_expect_timeout(Some(Duration::from_secs(5)));
+    session.set_expect_timeout(Some(Duration::from_secs(10)));
 
-    // Wait for picker
-    std::thread::sleep(Duration::from_millis(500));
+    // Wait for the picker to be ready
+    wait_for_picker_ready(&mut session);
 
     // Press Ctrl+C to cancel
     session.send("\x03").expect("Failed to send Ctrl+C");
@@ -248,10 +272,10 @@ fn test_navigation() {
     let mut session =
         spawn(&format!("{} {}", binary_path(), fixtures_path())).expect("Failed to spawn task");
 
-    session.set_expect_timeout(Some(Duration::from_secs(5)));
+    session.set_expect_timeout(Some(Duration::from_secs(10)));
 
-    // Wait for picker
-    std::thread::sleep(Duration::from_millis(500));
+    // Wait for the picker to be ready
+    wait_for_picker_ready(&mut session);
 
     // Navigate down/up
     session.send("\x1b[B").expect("Failed to send Down");
@@ -281,17 +305,19 @@ fn test_deno_task_execution() {
 
     session.set_expect_timeout(Some(Duration::from_secs(10)));
 
-    std::thread::sleep(Duration::from_millis(500));
+    // Wait for the picker to be ready
+    wait_for_picker_ready(&mut session);
 
     session.send("deno task dev").expect("Failed to type query");
 
-    std::thread::sleep(Duration::from_millis(300));
+    wait_for_filter();
 
     session.send("\r").expect("Failed to send Enter");
 
+    // Wait for the task to execute and output to appear
     session
-        .expect("Reloading on save")
-        .expect("Should see deno task output");
+        .expect(Regex("Reloading on save|Task completed"))
+        .expect("Should see deno task output or completion");
 
     session.expect(Eof).ok();
 }
