@@ -1,6 +1,5 @@
 //! Message types for UI/Backend communication
 
-use crate::registry::TaskId;
 use crate::RunnerType;
 use std::path::PathBuf;
 
@@ -38,9 +37,7 @@ pub struct SearchResponse {
 /// Task item stored in shared storage
 #[derive(Debug, Clone)]
 pub struct TaskItem {
-    pub id: TaskId,
     pub folder: String,
-    pub name: String,
     pub command: String,
     pub script: Option<String>,
     pub runner_type: RunnerType,
@@ -57,10 +54,6 @@ impl TaskItem {
 /// Full task information for the selected task (used when running)
 #[derive(Debug, Clone)]
 pub struct SelectedTask {
-    #[allow(dead_code)]
-    pub id: TaskId,
-    #[allow(dead_code)]
-    pub name: String,
     pub command: String,
     pub script: Option<String>,
     pub runner_type: RunnerType,
@@ -70,8 +63,6 @@ pub struct SelectedTask {
 impl From<&TaskItem> for SelectedTask {
     fn from(item: &TaskItem) -> Self {
         Self {
-            id: item.id,
-            name: item.name.clone(),
             command: item.command.clone(),
             script: item.script.clone(),
             runner_type: item.runner_type,

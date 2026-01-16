@@ -109,16 +109,14 @@ impl Backend {
             };
 
             let len_before = self.registry.len();
-            let id = self.registry.insert(registry_task.clone());
+            self.registry.insert(registry_task.clone());
 
             // Only add if new (registry grew)
             if self.registry.len() > len_before {
                 let folder = registry_task.folder_display(&self.root);
 
                 let item = TaskItem {
-                    id,
                     folder: folder.clone(),
-                    name: task.name.clone(),
                     command: task.command.clone(),
                     script: task.script.clone(),
                     runner_type: runner.runner_type,
@@ -378,7 +376,7 @@ mod tests {
 
         let tasks = tasks.read().unwrap();
         assert_eq!(tasks.len(), 1);
-        assert_eq!(tasks[0].name, "build");
+        assert_eq!(tasks[0].command, "npm run build");
         assert_eq!(tasks[0].folder, ".");
     }
 
