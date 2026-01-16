@@ -142,6 +142,114 @@ impl Backend {
         }
     }
 
+    /// Calculate the correct scroll offset to make selected_index visible
+    fn calculate_scroll_for_selected(
+        &self,
+        all_indices: &[u32],
+        requested_offset: usize,
+        selected_index: usize,
+        viewport_lines: usize,
+    ) -> usize {
+        if all_indices.is_empty() || viewport_lines == 0 {
+            return 0;
+        }
+
+        let selected_index = selected_index.min(all_indices.len().saturating_sub(1));
+        let tasks = self.tasks.read().unwrap();
+
+        // Helper to count headers for a task when it's at a given position in viewport
+        let headers_for_task = |idx: usize, prev_idx: Option<usize>| -> usize {
+            let folder = &tasks[all_indices[idx] as usize].folder;
+            if let Some(prev) = prev_idx {
+                let prev_folder = &tasks[all_indices[prev] as usize].folder;
+                if prev_folder == folder {
+                    0
+                } else {
+                    let prev_segs: Vec<&str> = if prev_folder == "." {
+                        vec![]
+                    } else {
+                        prev_folder.split('/').collect()
+                    };
+                    let curr_segs: Vec<&str> = if folder == "." {
+                        vec![]
+                    } else {
+                        folder.split('/').collect()
+                    };
+                    let common = prev_segs
+                        .iter()
+                        .zip(curr_segs.iter())
+                        .take_while(|(a, b)| a == b)
+                        .count();
+                    curr_segs.len() - common
+                }
+            } else {
+                // First task in viewport - count root + folder depth
+                if folder == "." {
+                    1
+                } else {
+                    1 + folder.split('/').count()
+                }
+            }
+        };
+
+        // Check if selected is visible from requested_offset
+        let mut lines_used = 0;
+        for i in requested_offset..all_indices.len() {
+            let prev = if i == requested_offset {
+                None
+            } else {
+                Some(i - 1)
+            };
+            let headers = headers_for_task(i, prev);
+            let task_lines = headers + 1;
+
+            if lines_used + task_lines > viewport_lines {
+                break;
+            }
+            lines_used += task_lines;
+
+            if i == selected_index {
+                // Selected is visible from requested_offset
+                return requested_offset;
+            }
+        }
+
+        // Selected not visible - need to calculate new scroll
+        if selected_index < requested_offset {
+            // Selected is above viewport - put it at top
+            return selected_index;
+        }
+
+        // Selected is below viewport - find smallest scroll that shows it
+        // Start from requested_offset+1 and search forward until selected fits
+        for try_scroll in (requested_offset + 1)..=selected_index {
+            let mut lines_used = 0;
+            let mut selected_fits = false;
+
+            for i in try_scroll..=selected_index {
+                let prev = if i == try_scroll { None } else { Some(i - 1) };
+                let headers = headers_for_task(i, prev);
+                let task_lines = headers + 1;
+
+                if lines_used + task_lines > viewport_lines {
+                    break;
+                }
+                lines_used += task_lines;
+
+                if i == selected_index {
+                    selected_fits = true;
+                    break;
+                }
+            }
+
+            if selected_fits {
+                return try_scroll;
+            }
+        }
+
+        selected_index // Fallback - show selected at top
+    }
+
     /// Handle a search request
     fn handle_search(&mut self, req: SearchRequest) -> SearchResponse {
         // Update pattern if query changed
@@ -183,16 +291,24 @@ impl Backend {
                 .collect()
         };
 
-        // Return only the requested slice
+        // Calculate corrected scroll offset
+        let corrected_offset = self.calculate_scroll_for_selected(
+            &matched_indices,
+            req.offset,
+            req.selected_index,
+            req.viewport_lines,
+        );
+
+        // Return slice from corrected offset
         let total_tasks = self.tasks.read().unwrap().len();
         let matched_tasks = matched_indices.len();
-        let start = req.offset.min(matched_tasks);
-        let end = (req.offset + req.limit).min(matched_tasks);
+        let start = corrected_offset.min(matched_tasks);
+        let end = (corrected_offset + req.limit).min(matched_tasks);
         let sliced = matched_indices[start..end].to_vec();
 
         SearchResponse {
             matched_indices: sliced,
-            offset: start,
+            offset: corrected_offset,
             total_tasks,
             matched_tasks,
             scanning_done: self.scanning_done,
@@ -324,6 +440,8 @@ mod tests {
             query: String::new(),
             offset: 0,
             limit: 100,
+            viewport_lines: 30,
+            selected_index: 0,
         });
 
         // Should be sorted by folder: a before b

@@ -3,6 +3,33 @@
 use crate::backend::SharedTasks;
 use crate::messages::{SearchResponse, TaskItem};
 use crate::ui::{Mode, UIState};
+use nucleo::pattern::{Atom, CaseMatching, Normalization, Pattern};
+use nucleo::{Config, Matcher, Utf32Str};
+
+/// Compute match indices for a short text (like folder name) against pattern atoms.
+/// Tries each atom individually and collects all matching indices.
+fn compute_short_text_matches(
+    text: &str,
+    atoms: &[Atom],
+    matcher: &mut Matcher,
+    indices_buf: &mut Vec<u32>,
+) -> Vec<u32> {
+    let mut all_indices = Vec::new();
+    let mut buf = Vec::new();
+    let haystack = Utf32Str::new(text, &mut buf);
+
+    for atom in atoms {
+        indices_buf.clear();
+        if atom.indices(haystack, matcher, indices_buf).is_some() {
+            all_indices.extend(indices_buf.iter().copied());
+        }
+    }
+
+    // Deduplicate and sort
+    all_indices.sort_unstable();
+    all_indices.dedup();
+    all_indices
+}
 
 /// Display item for rendering
 pub enum DisplayItem<'a> {
@@ -11,12 +38,16 @@ pub enum DisplayItem<'a> {
         depth: usize,
         is_last: bool,
         parent_is_last: Vec<bool>,
+        /// Match indices for highlighting (relative to folder name)
+        match_indices: Vec<u32>,
     },
     Task {
         task: &'a TaskItem,
         depth: usize,
         is_last: bool,
         parent_is_last: Vec<bool>,
+        /// Match indices for highlighting (relative to command string)
+        match_indices: Vec<u32>,
     },
 }
 
@@ -25,10 +56,24 @@ pub fn build_display_items<'a>(
     tasks: &'a [TaskItem],
     matched_indices: &[u32],
     root_name: &'a str,
+    query: &str,
 ) -> Vec<DisplayItem<'a>> {
     if matched_indices.is_empty() {
         return vec![];
     }
+
+    // Create pattern and matcher for highlighting only when there's a query
+    let pattern = if !query.is_empty() {
+        Some(Pattern::parse(
+            query,
+            CaseMatching::Ignore,
+            Normalization::Smart,
+        ))
+    } else {
+        None
+    };
+    let mut matcher = Matcher::new(Config::DEFAULT);
+    let mut indices_buf = Vec::new();
 
     let mut items = Vec::new();
     let mut current_folder: Option<&str> = None;
@@ -46,17 +91,21 @@ pub fn build_display_items<'a>(
         }
     }
 
-    // Emit root folder
+    // Emit root folder (compute highlights for root name)
+    let root_match_indices = if let Some(ref pattern) = pattern {
+        compute_short_text_matches(root_name, &pattern.atoms, &mut matcher, &mut indices_buf)
+    } else {
+        vec![]
+    };
     items.push(DisplayItem::Folder {
         name: root_name,
         depth: 0,
         is_last: true,
         parent_is_last: vec![],
+        match_indices: root_match_indices,
     });
 
     for (group_idx, (folder, task_indices)) in folder_groups.iter().enumerate() {
-        let is_last_folder_group = group_idx == folder_groups.len() - 1;
-
         // Emit folder headers if folder changed
         if current_folder != Some(folder) {
             // Determine folder path segments
@@ -107,11 +156,24 @@ pub fn build_display_items<'a>(
                     .map(|(_, is_last)| *is_last)
                     .collect();
 
+                // Compute match indices for this folder segment
+                let folder_match_indices = if let Some(ref pattern) = pattern {
+                    compute_short_text_matches(
+                        segment,
+                        &pattern.atoms,
+                        &mut matcher,
+                        &mut indices_buf,
+                    )
+                } else {
+                    vec![]
+                };
+
                 items.push(DisplayItem::Folder {
                     name: segment,
                     depth,
                     is_last: is_last_at_depth,
                     parent_is_last,
+                    match_indices: folder_match_indices,
                 });
             }
 
@@ -127,16 +189,36 @@ pub fn build_display_items<'a>(
 
         for (task_idx_in_group, &idx) in task_indices.iter().enumerate() {
             let task = &tasks[idx as usize];
-            let is_last_task = task_idx_in_group == task_indices.len() - 1 && is_last_folder_group;
+            let is_last_task = task_idx_in_group == task_indices.len() - 1;
 
             let parent_is_last: Vec<bool> =
                 folder_stack.iter().map(|(_, is_last)| *is_last).collect();
+
+            // Compute match indices for this task's command
+            let match_indices = if let Some(ref pattern) = pattern {
+                indices_buf.clear();
+                // Match against same search text as backend: "{folder} {command}"
+                let search_text = format!("{} {}", task.folder, task.command);
+                let mut buf = Vec::new();
+                let haystack = Utf32Str::new(&search_text, &mut buf);
+                pattern.indices(haystack, &mut matcher, &mut indices_buf);
+
+                // Convert indices: subtract folder prefix length to get command-relative indices
+                let prefix_len = (task.folder.len() + 1) as u32; // +1 for space
+                indices_buf
+                    .iter()
+                    .filter_map(|&i| i.checked_sub(prefix_len))
+                    .collect()
+            } else {
+                vec![]
+            };
 
             items.push(DisplayItem::Task {
                 task,
                 depth: task_depth,
                 is_last: is_last_task,
                 parent_is_last,
+                match_indices,
             });
         }
     }
@@ -158,11 +240,9 @@ fn tree_prefix(depth: usize, is_last: bool, parent_is_last: &[bool]) -> String {
     prefix
 }
 
-/// Render result containing the output string and metadata
+/// Render result containing the output string
 pub struct RenderResult {
     pub output: String,
-    /// Number of tasks that were actually rendered (not including folder headers)
-    pub tasks_rendered: usize,
 }
 
 /// Render the entire UI to a string
@@ -210,7 +290,12 @@ pub fn render(
     // Build display items from shared tasks
     // matched_indices is a slice starting at response.offset
     let tasks_guard = tasks.read().unwrap();
-    let display_items = build_display_items(&tasks_guard, &response.matched_indices, root_name);
+    let display_items = build_display_items(
+        &tasks_guard,
+        &response.matched_indices,
+        root_name,
+        &state.query,
+    );
 
     // The selected_index is absolute, convert to relative within this slice
     let relative_selected = state.selected_index.saturating_sub(response.offset);
@@ -252,10 +337,7 @@ pub fn render(
     }
 
     output.push_str("\x1b[J");
-    RenderResult {
-        output,
-        tasks_rendered: task_idx,
-    }
+    RenderResult { output }
 }
 
 /// Render input with cursor highlight
@@ -278,14 +360,16 @@ fn render_item(item: &DisplayItem, is_selected: bool, state: &UIState) -> String
             depth,
             is_last,
             parent_is_last,
+            match_indices,
         } => {
             let prefix = tree_prefix(*depth, *is_last, parent_is_last);
+            let highlighted_name = render_folder_highlighted(name, match_indices);
             if *depth == 0 {
-                format!("  📁 \x1b[1;37m{}\x1b[0m\x1b[K\r\n", name)
+                format!("  📁 {}\x1b[K\r\n", highlighted_name)
             } else {
                 format!(
-                    "\x1b[90m{}\x1b[0m 📁 \x1b[1;37m{}\x1b[0m\x1b[K\r\n",
-                    prefix, name
+                    "\x1b[90m{}\x1b[0m 📁 {}\x1b[K\r\n",
+                    prefix, highlighted_name
                 )
             }
         }
@@ -294,6 +378,7 @@ fn render_item(item: &DisplayItem, is_selected: bool, state: &UIState) -> String
             depth,
             is_last,
             parent_is_last,
+            match_indices,
         } => {
             let prefix = tree_prefix(*depth, *is_last, parent_is_last);
             let is_editing = is_selected && matches!(state.mode, Mode::Edit | Mode::Expanded);
@@ -310,7 +395,7 @@ fn render_item(item: &DisplayItem, is_selected: bool, state: &UIState) -> String
             } else if is_dimmed {
                 format!("\x1b[90m{}\x1b[0m", task.command)
             } else {
-                render_command_highlighted(&task.command, &[])
+                render_command_highlighted(&task.command, match_indices)
             };
 
             let branch_color = if is_selected { "36" } else { "90" };
@@ -329,6 +414,25 @@ fn render_item(item: &DisplayItem, is_selected: bool, state: &UIState) -> String
             }
         }
     }
+}
+
+/// Render folder name with match highlighting (underline matched chars)
+fn render_folder_highlighted(name: &str, match_indices: &[u32]) -> String {
+    if match_indices.is_empty() {
+        return format!("\x1b[1;37m{}\x1b[0m", name);
+    }
+
+    let mut result = String::new();
+    for (i, c) in name.chars().enumerate() {
+        let is_match = match_indices.contains(&(i as u32));
+        if is_match {
+            // Bold + underline for matches
+            result.push_str(&format!("\x1b[1;37;4m{}\x1b[0m", c));
+        } else {
+            result.push_str(&format!("\x1b[1;37m{}\x1b[0m", c));
+        }
+    }
+    result
 }
 
 /// Render command with match highlighting (underline matched chars)

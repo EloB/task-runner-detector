@@ -303,6 +303,8 @@ mod tests {
             query: String::new(),
             offset: 0,
             limit: 100,
+            viewport_lines: 30,
+            selected_index: 0,
         };
 
         // Get search response

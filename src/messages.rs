@@ -13,15 +13,19 @@ pub struct SearchRequest {
     pub offset: usize,
     /// Number of items to return
     pub limit: usize,
+    /// Viewport height in lines
+    pub viewport_lines: usize,
+    /// Currently selected task index
+    pub selected_index: usize,
 }
 
 /// Response from Backend to UI with search results
 #[derive(Debug, Clone)]
 pub struct SearchResponse {
     /// Matched task indices (sorted by folder, then runner type, then name)
-    /// This is a slice starting at the requested offset
+    /// This is a slice starting at the corrected offset
     pub matched_indices: Vec<u32>,
-    /// Offset this slice starts at
+    /// Corrected scroll offset that ensures selected task is visible
     pub offset: usize,
     /// Total number of tasks in registry
     pub total_tasks: usize,

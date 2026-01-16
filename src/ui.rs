@@ -98,7 +98,6 @@ fn run_ui_loop(
     let mut state = UIState::default();
     let mut last_response: Option<SearchResponse> = None;
     let mut needs_search = true;
-    let mut tasks_visible: usize = 10; // Track how many tasks fit in viewport (updated after render)
 
     loop {
         let (_, height) = terminal::size().unwrap_or((80, 24));
@@ -106,14 +105,14 @@ fn run_ui_loop(
 
         // Send search request if needed
         if needs_search {
-            // Request enough items to fill viewport with buffer for folders
             let request = SearchRequest {
                 query: state.query.clone(),
                 offset: state.scroll_offset,
-                limit: viewport_height * 2, // Extra buffer for folder headers
+                limit: viewport_height * 2,
+                viewport_lines: viewport_height,
+                selected_index: state.selected_index,
             };
             if request_tx.send(request).is_err() {
-                // Backend disconnected
                 return None;
             }
             needs_search = false;
@@ -131,9 +130,8 @@ fn run_ui_loop(
                     state.selected_index = 0;
                 }
 
-                // Update scroll offset based on actual visible tasks from last render
-                state.scroll_offset =
-                    derive_scroll(state.selected_index, state.scroll_offset, tasks_visible);
+                // Use backend's corrected scroll offset
+                state.scroll_offset = response.offset;
 
                 // If scanning is still in progress, request another update
                 if !response.scanning_done {
@@ -144,7 +142,6 @@ fn run_ui_loop(
             }
             Err(TryRecvError::Empty) => {}
             Err(TryRecvError::Disconnected) => {
-                // Backend disconnected
                 return None;
             }
         }
@@ -154,8 +151,6 @@ fn run_ui_loop(
             if let Ok(CrosstermEvent::Key(key)) = event::read() {
                 let task_count = last_response.as_ref().map(|r| r.matched_tasks).unwrap_or(0);
 
-                // Get selected task from shared storage
-                // selected_index is absolute, matched_indices starts at response.offset
                 let selected_task = last_response.as_ref().and_then(|r| {
                     let relative_idx = state.selected_index.saturating_sub(r.offset);
                     get_selected_task(&tasks, &r.matched_indices, relative_idx)
@@ -163,29 +158,15 @@ fn run_ui_loop(
 
                 match handle_key(state.clone(), key, selected_task.as_ref(), task_count) {
                     UpdateResult::Continue(new_state) => {
-                        // Check if query changed
                         let query_changed = new_state.query != state.query;
-
                         state = new_state;
 
                         if query_changed {
-                            // Reset selection on query change
                             state.selected_index = 0;
                             state.scroll_offset = 0;
-                            needs_search = true;
-                        } else {
-                            // Update scroll offset to follow selection
-                            // Use actual visible task count from last render
-                            let new_scroll = derive_scroll(
-                                state.selected_index,
-                                state.scroll_offset,
-                                tasks_visible.max(1),
-                            );
-                            if new_scroll != state.scroll_offset {
-                                state.scroll_offset = new_scroll;
-                                needs_search = true; // Need new slice from backend
-                            }
                         }
+                        // Request new data - backend will calculate correct scroll
+                        needs_search = true;
                     }
                     UpdateResult::Exit(result) => return result,
                 }
@@ -196,10 +177,6 @@ fn run_ui_loop(
         if let Some(ref response) = last_response {
             execute!(stdout, MoveTo(0, 0)).ok();
             let result = render(&state, response, &tasks, root_name, height as usize);
-            // Update visible task count for scroll calculations
-            if result.tasks_rendered > 0 {
-                tasks_visible = result.tasks_rendered;
-            }
             write!(stdout, "{}", result.output).ok();
             stdout.flush().ok();
         }
@@ -359,21 +336,6 @@ fn move_selection(current: usize, total: usize, delta: isize) -> usize {
     ((current as isize + delta).rem_euclid(total as isize)) as usize
 }
 
-/// Derive scroll offset to keep selection visible
-/// The viewport_size is how many tasks we display (not terminal lines)
-fn derive_scroll(selected_index: usize, current_scroll: usize, viewport_size: usize) -> usize {
-    if selected_index < current_scroll {
-        // Selection is above viewport - scroll to put selection at top
-        selected_index
-    } else if selected_index >= current_scroll + viewport_size {
-        // Selection is below viewport - scroll to put selection at bottom
-        selected_index.saturating_sub(viewport_size) + 1
-    } else {
-        // Selection is within viewport
-        current_scroll
-    }
-}
-
 /// Apply a key event to a text buffer
 fn apply_input_event(buffer: &str, cursor: usize, key: KeyEvent) -> (String, usize) {
     let chars: Vec<char> = buffer.chars().collect();
@@ -455,18 +417,6 @@ mod tests {
         assert_eq!(move_selection(0, 5, -1), 4);
         assert_eq!(move_selection(4, 5, 1), 0);
         assert_eq!(move_selection(2, 5, 1), 3);
-    }
-
-    #[test]
-    fn test_derive_scroll() {
-        // Selection visible within viewport of 10 tasks
-        assert_eq!(derive_scroll(5, 0, 10), 0);
-        // Selection above viewport
-        assert_eq!(derive_scroll(2, 5, 10), 2);
-        // Selection at edge of viewport (index 10 triggers scroll)
-        assert_eq!(derive_scroll(10, 0, 10), 1);
-        // Selection further below
-        assert_eq!(derive_scroll(15, 0, 10), 6);
     }
 
     #[test]
