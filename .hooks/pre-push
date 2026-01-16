@@ -2,4 +2,4 @@
 # Pre-push hook - runs before pushing to remote
 # Edit this file to change what checks run
 
-cargo test || exit 1
+cargo test -- --test-threads=1 || exit 1

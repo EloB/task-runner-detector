@@ -63,7 +63,7 @@ tag-prefix = ""
 tag-message = "Release {{version}}"
 pre-release-commit-message = "chore: release {{version}}"
 # Run fmt check, clippy, and tests before releasing
-pre-release-hook = ["sh", "-c", "cargo fmt --check && cargo clippy -- -D warnings && cargo test"]
+pre-release-hook = ["sh", "-c", "cargo fmt --check && cargo clippy -- -D warnings && cargo test -- --test-threads=1"]
 
 [package.metadata.wix]
 upgrade-guid = "2C7B60A3-C012-4CA8-B417-3A3526B59152"
