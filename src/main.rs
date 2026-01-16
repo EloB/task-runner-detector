@@ -313,7 +313,11 @@ fn derive_items(state: &AppState, root: &Path) -> Vec<PickerItem> {
             });
         }
 
-        for (child_name, child_node) in &node.children {
+        // Sort children alphabetically for deterministic ordering
+        let mut sorted_children: Vec<_> = node.children.iter().collect();
+        sorted_children.sort_by(|(a, _), (b, _)| a.cmp(b));
+
+        for (child_name, child_node) in sorted_children {
             let child_path = if path.is_empty() {
                 child_name.clone()
             } else {
@@ -1047,7 +1051,7 @@ fn render_item(
                 )
             }
         }
-        PickerItem::Task { task_id, depth } => {
+        PickerItem::Task { task_id, .. } => {
             let Some(task) = state.get_task(task_id) else {
                 return String::new();
             };
@@ -1069,24 +1073,7 @@ fn render_item(
             };
 
             let branch_color = if is_selected { "36" } else { "90" };
-            if *depth <= 1 && prefix.trim().is_empty() {
-                if is_dimmed {
-                    format!(
-                        "  {} \x1b[90m{}\x1b[0m  {}\x1b[K\r\n",
-                        marker,
-                        task.runner.icon(),
-                        cmd
-                    )
-                } else {
-                    format!(
-                        "  {}{} {}  {}\x1b[K\r\n",
-                        marker,
-                        if is_selected { "\x1b[36m" } else { "" },
-                        task.runner.icon(),
-                        cmd
-                    )
-                }
-            } else if is_dimmed {
+            if is_dimmed {
                 format!(
                     "\x1b[90m{}{}\x1b[0m {} \x1b[90m{}\x1b[0m  {}\x1b[K\r\n",
                     prefix,
@@ -1503,5 +1490,71 @@ fn run_task(task: &DisplayTask, command: &str, root: &Path) {
             );
             std::process::exit(1);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Test that the first render matches the expected output
+    #[test]
+    fn test_first_render_matches_expected() {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        let root = PathBuf::from(manifest_dir);
+
+        // Scan the project root
+        let runners = task_runner_detector::scan_with_options(&root, ScanOptions::default())
+            .unwrap_or_default();
+
+        // Build state from runners
+        let mut state = AppState::default();
+        let mut matcher = Matcher::new(nucleo_matcher::Config::DEFAULT);
+
+        for runner in &runners {
+            let folder = folder_key(&runner.config_path, &root);
+            if !state.folder_ids.contains(&folder) {
+                state.folder_ids.push(folder.clone());
+            }
+
+            for task in &runner.tasks {
+                let display_task = DisplayTask {
+                    runner: runner.runner_type,
+                    config_path: runner.config_path.clone(),
+                    task: task.clone(),
+                };
+                let id = TaskId::from_task(&display_task);
+                if !state.tasks_by_id.contains_key(&id) {
+                    state.task_ids.push(id.clone());
+                    state.tasks_by_id.insert(id, display_task);
+                }
+            }
+        }
+        state.scanning_done = true;
+
+        // Select the first task
+        let items = derive_items(&state, &root);
+        let matching = compute_matching_tasks(&items, &state, "", &root, &mut matcher);
+
+        // Find first task and select it
+        for mt in &matching {
+            state.selected_task = Some(mt.task_id.clone());
+            break;
+        }
+
+        let derived = derive_all(&state, &root, &matching);
+
+        // Render with enough terminal height to show all items
+        let output = render(&state, &derived, &root, 50);
+
+        // Read expected output and compare
+        let expected_path = root.join("fixtures/first_render.txt");
+        let expected = std::fs::read_to_string(&expected_path)
+            .expect("Failed to read fixtures/first_render.txt");
+
+        assert_eq!(
+            output, expected,
+            "Render output doesn't match expected fixture"
+        );
     }
 }
