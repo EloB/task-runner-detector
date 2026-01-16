@@ -34,7 +34,7 @@ thiserror = "2"
 just = "1"
 
 # Fuzzy matching
-nucleo-matcher = "0.3"
+nucleo = "0.5"
 
 # Input handling
 tui-input = { version = "0.11", features = ["crossterm"] }
